@@ -1,0 +1,41 @@
+name: Cron Jobs
+on:
+  schedule:
+    # escalation-tick — closest supported approximation of the original every-minute
+    # schedule; GitHub Actions does not support intervals shorter than 5 minutes.
+    - cron: '*/5 * * * *'
+    - cron: '0 * * * *'   # digest-builder
+    - cron: '0 3 * * *'   # knowledge-staleness
+    - cron: '30 3 * * *'  # score-recompute
+    - cron: '0 4 * * *'   # metrics-rollup
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Cron job to run manually
+        required: true
+        type: choice
+        options:
+          - escalation-tick
+          - digest-builder
+          - knowledge-staleness
+          - score-recompute
+          - metrics-rollup
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve job name
+        id: job
+        run: |
+          case "${{ github.event.schedule }}" in
+            '*/5 * * * *') echo "name=escalation-tick" >> "$GITHUB_OUTPUT" ;;
+            '0 * * * *') echo "name=digest-builder" >> "$GITHUB_OUTPUT" ;;
+            '0 3 * * *') echo "name=knowledge-staleness" >> "$GITHUB_OUTPUT" ;;
+            '30 3 * * *') echo "name=score-recompute" >> "$GITHUB_OUTPUT" ;;
+            '0 4 * * *') echo "name=metrics-rollup" >> "$GITHUB_OUTPUT" ;;
+            *) echo "name=${{ inputs.job }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Invoke cron endpoint
+        run: |
+          curl -sf -X POST "${{ vars.API_BASE_URL }}/api/cron/${{ steps.job.outputs.name }}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
