@@ -1,6 +1,26 @@
 {
-  "name": "peerloop", "version": "1.0.0", "private": true,
-  "workspaces": ["apps/*", "packages/*"],
-  "scripts": { "typecheck": "npm run typecheck --workspaces --if-present", "test": "npm -w packages/core test", "build": "npm -w apps/api run build", "dev:api": "npm -w apps/api run dev", "dev:mobile": "npm -w apps/mobile start" },
-  "engines": { "node": ">=22.18.0" }
+  "name": "peerloop",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm -w packages/core test && npm -w apps/api test",
+    "test:e2e": "playwright test",
+    "lint": "npm -w apps/api run lint",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "build": "npm -w apps/api run build",
+    "dev:api": "npm -w apps/api run dev",
+    "dev:mobile": "npm -w apps/mobile start"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "prettier": "^3.9.8"
+  }
 }

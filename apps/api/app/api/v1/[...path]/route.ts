@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { DomainError, Engine, inputSchemas, seedDatabase, responseSchema } from '@peerloop/core';
 import { ZodError } from 'zod';
 import { withAuth, authRoute } from '../../../../lib/auth';
-import { transact } from '../../../../lib/store';
+import { transact, requestScope } from '../../../../lib/store';
 import { dispatchNotifications } from '../../../../lib/dispatch';
 import { RemoteProvider } from '../../../../lib/agent/provider';
 import { serverNow, advanceClock } from '../../../../lib/clock';
@@ -21,14 +21,15 @@ async function handler(req:NextRequest){
       if(path==='dev/reset'){if(req.method!=='POST')throw new DomainError('METHOD','Use POST.',405);const now=await serverNow();return NextResponse.json(await transact(()=>({ok:true}),{reset:seedDatabase(now)}),{headers:cors(req)});}
       let now=await serverNow();
       if(path==='dev/advance'){if(req.method!=='POST')throw new DomainError('METHOD','Use POST.',405);now=await advanceClock(inputSchemas.advance.parse(body).hours);}
+      const scope=await requestScope(path,body,user_id);
       const result=await transact(async db=>{
         const scale=development?Math.min(3600,Math.max(1,Number(request.headers.get('X-Peerloop-Time-Scale'))||1)):1;
         const engine=new Engine(db,{user_id,now,time_scale:scale,provider:process.env.MODEL_ENDPOINT?new RemoteProvider():undefined,measure:()=>performance.now()});
         if(path==='dev/inspect')return db.agent_runs.slice(-20);
         if(path==='dev/advance')return {swept:engine.sweep(undefined,200)};
         return responseSchema(req.method,req.nextUrl.pathname).parse(await engine.handle(req.method,req.nextUrl.pathname+req.nextUrl.search,body));
-      });
-      after(async()=>{await transact(db=>dispatchNotifications(db,Date.now())).catch(error=>console.error('Notification dispatch failed',String(error)));});
+      },{scope});
+      after(async()=>{await dispatchNotifications(Date.now()).catch(error=>console.error('Notification dispatch failed',String(error)));});
       return NextResponse.json(result,{headers:cors(req)});
     })(req);
   }catch(error){

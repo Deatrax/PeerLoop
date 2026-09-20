@@ -1,21 +1,316 @@
-import { pgTable, text, integer, boolean, jsonb, timestamp, doublePrecision, index, uniqueIndex, primaryKey } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
-const id=()=>text('id').primaryKey();
-const time=(name:string)=>timestamp(name,{withTimezone:true,mode:'string'});
-export const users=pgTable('users',{id:id(),student_id:text('student_id').notNull().unique(),name:text('name').notNull(),email:text('email').notNull().unique(),avatar_initials:text('avatar_initials').notNull(),active_space_id:text('active_space_id'),push_tokens:jsonb('push_tokens').notNull(),preferences:jsonb('preferences').notNull(),created_at:time('created_at').notNull()});
-export const spaces=pgTable('spaces',{id:id(),org_id:text('org_id').notNull(),kind:text('kind').notNull(),code:text('code').notNull(),title:text('title').notNull(),term:text('term').notNull(),section:text('section').notNull(),color_token:text('color_token').notNull(),join_code:text('join_code').notNull().unique(),allow_sibling_relay:boolean('allow_sibling_relay').notNull(),agent_enabled:boolean('agent_enabled').notNull().default(true),pace_override:doublePrecision('pace_override').notNull().default(1),policy_locked:boolean('policy_locked').notNull(),archived_at:time('archived_at')});
-export const org_memberships=pgTable('org_memberships',{user_id:text('user_id').notNull().references(()=>users.id),org_id:text('org_id').notNull(),role:text('role').notNull()},t=>[primaryKey({columns:[t.user_id,t.org_id]})]);
-export const space_memberships=pgTable('space_memberships',{id:id(),space_id:text('space_id').notNull().references(()=>spaces.id),user_id:text('user_id').notNull().references(()=>users.id),role:text('role').notNull(),joined_at:time('joined_at').notNull(),helper_score:doublePrecision('helper_score').notNull().default(0),verified_helper:boolean('verified_helper').notNull().default(false),notified_count_7d:integer('notified_count_7d').notNull(),accepted_answers_30d:integer('accepted_answers_30d').notNull(),notified_count_30d:integer('notified_count_30d').notNull(),last_active_at:time('last_active_at').notNull(),muted_until:time('muted_until'),lab_group:text('lab_group').notNull(),section:text('section').notNull(),notification_budget_override:integer('notification_budget_override'),notifications_sent_today:integer('notifications_sent_today').notNull(),accepted_tags:jsonb('accepted_tags').notNull(),status:text('status').notNull(),creation_muted_until:time('creation_muted_until')},t=>[uniqueIndex('membership_unique').on(t.space_id,t.user_id)]);
-export const space_links=pgTable('space_links',{space_id:text('space_id').notNull().references(()=>spaces.id),sibling_space_id:text('sibling_space_id').notNull().references(()=>spaces.id),relation:text('relation').notNull(),relay_enabled:boolean('relay_enabled').notNull().default(false)},t=>[primaryKey({columns:[t.space_id,t.sibling_space_id]})]);
-export const requests=pgTable('requests',{id:id(),space_id:text('space_id').notNull().references(()=>spaces.id),author_id:text('author_id').notNull().references(()=>users.id),body_text:text('body_text').notNull(),normalised_question:text('normalised_question').notNull(),category:text('category').notNull(),request_class:text('request_class').notNull(),priority:text('priority').notNull(),tags:jsonb('tags').notNull(),audience_tier:text('audience_tier').notNull(),state:text('state').notNull(),parent_request_id:text('parent_request_id'),merged_count:integer('merged_count').notNull().default(1),policy_snapshot:jsonb('policy_snapshot').notNull(),next_escalation_at:time('next_escalation_at'),grace_until:time('grace_until'),responder_ids:jsonb('responder_ids').notNull(),accepted_answer_id:text('accepted_answer_id'),resolved_at:time('resolved_at'),closed_reason:text('closed_reason'),contains_personal_info:boolean('contains_personal_info').notNull(),needs_review:boolean('needs_review').notNull(),skipped_tiers:jsonb('skipped_tiers').notNull(),held_reason:text('held_reason'),attempt:integer('attempt').notNull(),created_at:time('created_at').notNull(),updated_at:time('updated_at').notNull()},t=>[index('requests_due_idx').on(t.next_escalation_at).where(sql`${t.state} in ('ROUTED','ESCALATED')`),index('requests_space_idx').on(t.space_id,t.state,t.created_at.desc()),index('requests_author_idx').on(t.author_id,t.created_at.desc())]);
-export const request_events=pgTable('request_events',{id:id(),request_id:text('request_id').notNull().references(()=>requests.id),from_state:text('from_state').notNull(),to_state:text('to_state').notNull(),tier:text('tier').notNull(),actor_type:text('actor_type').notNull(),actor_id:text('actor_id'),reason:text('reason').notNull(),dedupe_key:text('dedupe_key').notNull().unique(),at:time('at').notNull()});
-export const request_recipients=pgTable('request_recipients',{request_id:text('request_id').notNull().references(()=>requests.id),user_id:text('user_id').notNull().references(()=>users.id),tier:text('tier').notNull(),notified_at:time('notified_at').notNull(),opened_at:time('opened_at'),responded_at:time('responded_at'),score_snapshot:jsonb('score_snapshot')},t=>[primaryKey({columns:[t.request_id,t.user_id]}),index('recipient_user_idx').on(t.user_id,t.notified_at.desc())]);
-export const messages=pgTable('messages',{id:id(),request_id:text('request_id').notNull().references(()=>requests.id),author_id:text('author_id').references(()=>users.id),author_type:text('author_type').notNull(),body_markdown:text('body_markdown').notNull(),cited_item_ids:jsonb('cited_item_ids').notNull(),is_accepted:boolean('is_accepted').notNull(),created_at:time('created_at').notNull()});
-export const knowledge_items=pgTable('knowledge_items',{id:id(),space_id:text('space_id').notNull().references(()=>spaces.id),kind:text('kind').notNull(),title:text('title').notNull(),body_markdown:text('body_markdown').notNull(),url:text('url'),category:text('category').notNull(),status:text('status').notNull(),origin:text('origin').notNull(),source_request_id:text('source_request_id').references(()=>requests.id),contributor_ids:jsonb('contributor_ids').notNull(),pin_order:integer('pin_order'),expires_at:time('expires_at').notNull(),last_retrieved_at:time('last_retrieved_at'),retrieval_hits:integer('retrieval_hits').notNull(),false_positive_count:integer('false_positive_count').notNull(),created_by:text('created_by').references(()=>users.id),created_at:time('created_at').notNull(),tags:jsonb('tags').notNull(),published:boolean('published').notNull(),previously_verified:boolean('previously_verified').notNull()});
-export const escalation_policies=pgTable('escalation_policies',{id:id(),space_id:text('space_id').notNull().references(()=>spaces.id),request_class:text('request_class').notNull(),steps:jsonb('steps').notNull(),quiet_hours:jsonb('quiet_hours').notNull(),grace_period_minutes:integer('grace_period_minutes').notNull(),locked_by_instructor:boolean('locked_by_instructor').notNull(),pace_override:doublePrecision('pace_override').notNull(),final_action:text('final_action').notNull(),updated_by:text('updated_by'),updated_at:time('updated_at').notNull(),time_scale:doublePrecision('time_scale').notNull()},t=>[uniqueIndex('policy_unique').on(t.space_id,t.request_class)]);
-export const approval_tasks=pgTable('approval_tasks',{id:id(),space_id:text('space_id').notNull().references(()=>spaces.id),request_id:text('request_id').references(()=>requests.id),kind:text('kind').notNull(),payload:jsonb('payload').notNull(),requested_by_type:text('requested_by_type').notNull(),assignee_role:text('assignee_role').notNull(),assignee_id:text('assignee_id'),state:text('state').notNull(),decided_by:text('decided_by'),decided_at:time('decided_at'),note:text('note')});
-export const notifications=pgTable('notifications',{id:id(),user_id:text('user_id').notNull().references(()=>users.id),space_id:text('space_id').notNull().references(()=>spaces.id),event_type:text('event_type').notNull(),payload:jsonb('payload').notNull(),read_at:time('read_at'),delivered_channel:text('delivered_channel').notNull(),delivery_state:text('delivery_state').notNull(),created_at:time('created_at').notNull(),delivered_at:time('delivered_at'),error:text('error')});
-export const agent_runs=pgTable('agent_runs',{id:id(),request_id:text('request_id').notNull().references(()=>requests.id),step:text('step').notNull(),model:text('model').notNull(),prompt_hash:text('prompt_hash').notNull(),output_json:jsonb('output_json').notNull(),latency_ms:integer('latency_ms').notNull(),tokens_in:integer('tokens_in').notNull(),tokens_out:integer('tokens_out').notNull(),error:text('error'),created_at:time('created_at').notNull()});
-export const metrics_daily=pgTable('metrics_daily',{space_id:text('space_id').notNull().references(()=>spaces.id),day:text('day').notNull(),requests_created:integer('requests_created').notNull(),kb_resolved:integer('kb_resolved').notNull(),peer_resolved:integer('peer_resolved').notNull(),cr_resolved:integer('cr_resolved').notNull(),unresolved:integer('unresolved').notNull(),median_first_response_minutes:doublePrecision('median_first_response_minutes').notNull(),duplicate_rate:doublePrecision('duplicate_rate').notNull(),escalation_rate:doublePrecision('escalation_rate').notNull()},t=>[primaryKey({columns:[t.space_id,t.day]})]);
-export const auth_links=pgTable('auth_links',{id:id(),email:text('email').notNull(),expires_at:time('expires_at').notNull(),used_at:time('used_at'),created_at:time('created_at').notNull()});
-export const job_runs=pgTable('job_runs',{id:id(),finished_at:time('finished_at').notNull(),result:jsonb('result').notNull()});
+import {
+  pgTable,
+  text,
+  integer,
+  boolean,
+  jsonb,
+  timestamp,
+  doublePrecision,
+  index,
+  uniqueIndex,
+  primaryKey,
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+const id = () => text("id").primaryKey();
+const time = (name: string) =>
+  timestamp(name, { withTimezone: true, mode: "string" });
+export const users = pgTable("users", {
+  id: id(),
+  student_id: text("student_id").notNull().unique(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  avatar_initials: text("avatar_initials").notNull(),
+  active_space_id: text("active_space_id"),
+  push_tokens: jsonb("push_tokens").notNull(),
+  preferences: jsonb("preferences").notNull(),
+  created_at: time("created_at").notNull(),
+});
+export const spaces = pgTable("spaces", {
+  id: id(),
+  org_id: text("org_id").notNull(),
+  kind: text("kind").notNull(),
+  code: text("code").notNull(),
+  title: text("title").notNull(),
+  term: text("term").notNull(),
+  section: text("section").notNull(),
+  color_token: text("color_token").notNull(),
+  join_code: text("join_code").notNull().unique(),
+  allow_sibling_relay: boolean("allow_sibling_relay").notNull(),
+  agent_enabled: boolean("agent_enabled").notNull().default(true),
+  pace_override: doublePrecision("pace_override").notNull().default(1),
+  policy_locked: boolean("policy_locked").notNull(),
+  archived_at: time("archived_at"),
+});
+export const org_memberships = pgTable(
+  "org_memberships",
+  {
+    user_id: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    org_id: text("org_id").notNull(),
+    role: text("role").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.user_id, t.org_id] })],
+);
+export const space_memberships = pgTable(
+  "space_memberships",
+  {
+    id: id(),
+    space_id: text("space_id")
+      .notNull()
+      .references(() => spaces.id),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    role: text("role").notNull(),
+    joined_at: time("joined_at").notNull(),
+    helper_score: doublePrecision("helper_score").notNull().default(0),
+    verified_helper: boolean("verified_helper").notNull().default(false),
+    notified_count_7d: integer("notified_count_7d").notNull(),
+    accepted_answers_30d: integer("accepted_answers_30d").notNull(),
+    notified_count_30d: integer("notified_count_30d").notNull(),
+    last_active_at: time("last_active_at").notNull(),
+    muted_until: time("muted_until"),
+    lab_group: text("lab_group").notNull(),
+    section: text("section").notNull(),
+    notification_budget_override: integer("notification_budget_override"),
+    notifications_sent_today: integer("notifications_sent_today").notNull(),
+    accepted_tags: jsonb("accepted_tags").notNull(),
+    status: text("status").notNull(),
+    creation_muted_until: time("creation_muted_until"),
+  },
+  (t) => [uniqueIndex("membership_unique").on(t.space_id, t.user_id)],
+);
+export const space_links = pgTable(
+  "space_links",
+  {
+    space_id: text("space_id")
+      .notNull()
+      .references(() => spaces.id),
+    sibling_space_id: text("sibling_space_id")
+      .notNull()
+      .references(() => spaces.id),
+    relation: text("relation").notNull(),
+    relay_enabled: boolean("relay_enabled").notNull().default(false),
+  },
+  (t) => [primaryKey({ columns: [t.space_id, t.sibling_space_id] })],
+);
+export const requests = pgTable(
+  "requests",
+  {
+    id: id(),
+    space_id: text("space_id")
+      .notNull()
+      .references(() => spaces.id),
+    author_id: text("author_id")
+      .notNull()
+      .references(() => users.id),
+    body_text: text("body_text").notNull(),
+    normalised_question: text("normalised_question").notNull(),
+    category: text("category").notNull(),
+    request_class: text("request_class").notNull(),
+    priority: text("priority").notNull(),
+    tags: jsonb("tags").notNull(),
+    audience_tier: text("audience_tier").notNull(),
+    state: text("state").notNull(),
+    parent_request_id: text("parent_request_id"),
+    merged_count: integer("merged_count").notNull().default(1),
+    policy_snapshot: jsonb("policy_snapshot").notNull(),
+    next_escalation_at: time("next_escalation_at"),
+    grace_until: time("grace_until"),
+    responder_ids: jsonb("responder_ids").notNull(),
+    accepted_answer_id: text("accepted_answer_id"),
+    resolved_at: time("resolved_at"),
+    closed_reason: text("closed_reason"),
+    contains_personal_info: boolean("contains_personal_info").notNull(),
+    needs_review: boolean("needs_review").notNull(),
+    skipped_tiers: jsonb("skipped_tiers").notNull(),
+    held_reason: text("held_reason"),
+    attempt: integer("attempt").notNull(),
+    created_at: time("created_at").notNull(),
+    updated_at: time("updated_at").notNull(),
+  },
+  (t) => [
+    index("requests_due_idx")
+      .on(t.next_escalation_at)
+      .where(sql`${t.state} in ('ROUTED','ESCALATED','IN_PROGRESS')`),
+    index("requests_space_idx").on(t.space_id, t.state, t.created_at.desc()),
+    index("requests_author_idx").on(t.author_id, t.created_at.desc()),
+  ],
+);
+export const request_events = pgTable("request_events", {
+  id: id(),
+  request_id: text("request_id")
+    .notNull()
+    .references(() => requests.id),
+  from_state: text("from_state").notNull(),
+  to_state: text("to_state").notNull(),
+  tier: text("tier").notNull(),
+  actor_type: text("actor_type").notNull(),
+  actor_id: text("actor_id"),
+  reason: text("reason").notNull(),
+  dedupe_key: text("dedupe_key").notNull().unique(),
+  at: time("at").notNull(),
+});
+export const request_recipients = pgTable(
+  "request_recipients",
+  {
+    request_id: text("request_id")
+      .notNull()
+      .references(() => requests.id),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    tier: text("tier").notNull(),
+    notified_at: time("notified_at").notNull(),
+    opened_at: time("opened_at"),
+    responded_at: time("responded_at"),
+    score_snapshot: jsonb("score_snapshot"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.request_id, t.user_id] }),
+    index("recipient_user_idx").on(t.user_id, t.notified_at.desc()),
+  ],
+);
+export const messages = pgTable("messages", {
+  id: id(),
+  request_id: text("request_id")
+    .notNull()
+    .references(() => requests.id),
+  author_id: text("author_id").references(() => users.id),
+  author_type: text("author_type").notNull(),
+  body_markdown: text("body_markdown").notNull(),
+  cited_item_ids: jsonb("cited_item_ids").notNull(),
+  is_accepted: boolean("is_accepted").notNull(),
+  created_at: time("created_at").notNull(),
+});
+export const knowledge_items = pgTable("knowledge_items", {
+  id: id(),
+  space_id: text("space_id")
+    .notNull()
+    .references(() => spaces.id),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  body_markdown: text("body_markdown").notNull(),
+  url: text("url"),
+  category: text("category").notNull(),
+  status: text("status").notNull(),
+  origin: text("origin").notNull(),
+  source_request_id: text("source_request_id").references(() => requests.id),
+  contributor_ids: jsonb("contributor_ids").notNull(),
+  pin_order: integer("pin_order"),
+  expires_at: time("expires_at").notNull(),
+  last_retrieved_at: time("last_retrieved_at"),
+  retrieval_hits: integer("retrieval_hits").notNull(),
+  false_positive_count: integer("false_positive_count").notNull(),
+  created_by: text("created_by").references(() => users.id),
+  created_at: time("created_at").notNull(),
+  tags: jsonb("tags").notNull(),
+  published: boolean("published").notNull(),
+  previously_verified: boolean("previously_verified").notNull(),
+});
+export const escalation_policies = pgTable(
+  "escalation_policies",
+  {
+    id: id(),
+    space_id: text("space_id")
+      .notNull()
+      .references(() => spaces.id),
+    request_class: text("request_class").notNull(),
+    steps: jsonb("steps").notNull(),
+    quiet_hours: jsonb("quiet_hours").notNull(),
+    grace_period_minutes: integer("grace_period_minutes").notNull(),
+    locked_by_instructor: boolean("locked_by_instructor").notNull(),
+    pace_override: doublePrecision("pace_override").notNull(),
+    final_action: text("final_action").notNull(),
+    updated_by: text("updated_by"),
+    updated_at: time("updated_at").notNull(),
+    time_scale: doublePrecision("time_scale").notNull(),
+  },
+  (t) => [uniqueIndex("policy_unique").on(t.space_id, t.request_class)],
+);
+export const approval_tasks = pgTable("approval_tasks", {
+  id: id(),
+  space_id: text("space_id")
+    .notNull()
+    .references(() => spaces.id),
+  request_id: text("request_id").references(() => requests.id),
+  kind: text("kind").notNull(),
+  payload: jsonb("payload").notNull(),
+  requested_by_type: text("requested_by_type").notNull(),
+  assignee_role: text("assignee_role").notNull(),
+  assignee_id: text("assignee_id"),
+  state: text("state").notNull(),
+  decided_by: text("decided_by"),
+  decided_at: time("decided_at"),
+  note: text("note"),
+});
+export const notifications = pgTable("notifications", {
+  attempts: integer("attempts").notNull().default(0),
+  next_attempt_at: time("next_attempt_at"),
+  id: id(),
+  user_id: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  space_id: text("space_id")
+    .notNull()
+    .references(() => spaces.id),
+  event_type: text("event_type").notNull(),
+  payload: jsonb("payload").notNull(),
+  read_at: time("read_at"),
+  delivered_channel: text("delivered_channel").notNull(),
+  delivery_state: text("delivery_state").notNull(),
+  created_at: time("created_at").notNull(),
+  delivered_at: time("delivered_at"),
+  error: text("error"),
+});
+export const agent_runs = pgTable("agent_runs", {
+  id: id(),
+  request_id: text("request_id")
+    .notNull()
+    .references(() => requests.id),
+  step: text("step").notNull(),
+  model: text("model").notNull(),
+  prompt_hash: text("prompt_hash").notNull(),
+  output_json: jsonb("output_json").notNull(),
+  latency_ms: integer("latency_ms").notNull(),
+  tokens_in: integer("tokens_in").notNull(),
+  tokens_out: integer("tokens_out").notNull(),
+  error: text("error"),
+  created_at: time("created_at").notNull(),
+});
+export const metrics_daily = pgTable(
+  "metrics_daily",
+  {
+    space_id: text("space_id")
+      .notNull()
+      .references(() => spaces.id),
+    day: text("day").notNull(),
+    requests_created: integer("requests_created").notNull(),
+    kb_resolved: integer("kb_resolved").notNull(),
+    peer_resolved: integer("peer_resolved").notNull(),
+    cr_resolved: integer("cr_resolved").notNull(),
+    unresolved: integer("unresolved").notNull(),
+    median_first_response_minutes: doublePrecision(
+      "median_first_response_minutes",
+    ).notNull(),
+    duplicate_rate: doublePrecision("duplicate_rate").notNull(),
+    escalation_rate: doublePrecision("escalation_rate").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.space_id, t.day] })],
+);
+export const auth_links = pgTable("auth_links", {
+  id: id(),
+  email: text("email").notNull(),
+  expires_at: time("expires_at").notNull(),
+  used_at: time("used_at"),
+  created_at: time("created_at").notNull(),
+});
+export const job_runs = pgTable("job_runs", {
+  id: id(),
+  finished_at: time("finished_at").notNull(),
+  result: jsonb("result").notNull(),
+});
+export const job_leases = pgTable("job_leases", {
+  id: id(), owner: text("owner").notNull(), expires_at: time("expires_at").notNull(),
+});

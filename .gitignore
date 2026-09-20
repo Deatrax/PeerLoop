@@ -48,3 +48,6 @@ apps/api/.dev-state.json
 # Operating System files
 .DS_Store
 Thumbs.db
+
+Docs/
+.codex/

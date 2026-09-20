@@ -8,6 +8,13 @@
       "when": 1789922736999,
       "tag": "0000_fast_frank_castle",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789927595580,
+      "tag": "0001_colorful_hobgoblin",
+      "breakpoints": true
     }
   ]
 }

@@ -1,10 +1,310 @@
-import React, { useState } from 'react';
-import { Linking } from 'react-native';
-import { router, useLocalSearchParams, type Href } from 'expo-router';
-import type { KnowledgeItem } from '@peerloop/core';
-import { AgentQuote, Banner, Card, Copy, Field, Heading, LinkButton, Loading, NoteText, Pill, PrimaryButton, Row, Screen, SecondaryButton, Section, Stepper, useAction, useResource } from '../components';
-import { getRepository } from '../lib/repo';
-import { useRole, useSession } from '../store/session';
-export function ThreadScreen(){const {id}=useLocalSearchParams<{id:string}>();const user=useSession(s=>s.user),role=useRole(),[body,setBody]=useState(''),[reason,setReason]=useState('');const {run,busy}=useAction();const {data}=useResource(async()=>{const thread=await getRepository().getRequest(id);if(thread.request.space_id!==useSession.getState().active)await useSession.getState().switchSpace(thread.request.space_id);return thread;},[id]);if(!data)return <Screen title="Request" back><Loading/></Screen>;const r=data.request,manage=role==='CR'||role==='INSTRUCTOR',canAccept=user?.id===r.author_id||manage,closed=['RESOLVED','CLOSED_UNRESOLVED'].includes(r.state);return <Screen title="Request" back><Heading>{r.normalised_question}</Heading><Row><Pill>{r.priority}</Pill><Pill tone={r.state==='RESOLVED'?'resolved':'flare'}>{r.state.toLowerCase().replaceAll('_',' ')}</Pill></Row><Stepper request={r}/>{r.request_class==='AUTHORITY'&&<NoteText>This needs approval, not knowledge, so it skipped the peer stages entirely and went straight to your CR.</NoteText>}{r.merged_count>1&&<Banner>{r.merged_count} people are waiting on this thread. Everyone gets the accepted answer together.</Banner>}{r.held_reason&&<Banner>Clock held: {r.held_reason}</Banner>}<Section title="How it got here"/>{data.timeline.map(e=><NoteText key={e.id}>{e.reason}{'\n'}{new Date(e.at).toLocaleString()}</NoteText>)}<Section title="Answers & replies"/>{!data.messages.length&&<NoteText>No answer yet. PeerLoop will keep this moving through the hub’s escalation policy.</NoteText>}{data.messages.map(m=><React.Fragment key={m.id}>{m.author_type==='AGENT'?<AgentQuote body={m.body_markdown} sources={m.cited_item_ids} onSource={id=>router.push(`/card/${id}` as Href)}/>:<Card><Copy small bold>{m.author_id===user?.id?'You':'Community member'}{m.is_accepted?' · accepted answer':''}</Copy><Copy>{m.body_markdown}</Copy><Copy small muted>{new Date(m.created_at).toLocaleString()}</Copy></Card>}{canAccept&&!closed&&<SecondaryButton label="Accept this answer" disabled={busy} onPress={()=>void run(()=>getRepository().acceptAnswer(r.id,m.id),'Resolved. The useful answer stays in the hub.')}/>}</React.Fragment>)}{!closed&&<><Field label="Add a useful answer" value={body} onChangeText={setBody} multiline placeholder="Share what you know, and include a source if you have one."/><PrimaryButton label={role==='INSTRUCTOR'?'Answer & publish':'Send answer'} disabled={busy||!body.trim()} onPress={()=>void run(async()=>{await getRepository().postMessage(r.id,body,role==='INSTRUCTOR');setBody('');},'Your answer is in the thread.')}/><SecondaryButton label="I’m looking into this" onPress={()=>void run(()=>getRepository().call('POST',`/requests/${r.id}/claim`),'The clock now gives you a little room.')}/>{!data.messages.length&&<PrimaryButton label="Mark as resolved" disabled onPress={()=>{}}/>}</>}{manage&&!closed&&<><Section title="Class representative controls"/><Field label="Hold or close reason" value={reason} onChangeText={setReason}/><SecondaryButton label={r.held_reason?'Resume clock':'Hold request'} disabled={!r.held_reason&&!reason.trim()} onPress={()=>void run(()=>r.held_reason?getRepository().call('POST',`/requests/${r.id}/resume`):getRepository().holdRequest(r.id,reason))}/><SecondaryButton label="Escalate now" onPress={()=>void run(()=>getRepository().escalateNow(r.id),'The next step has been recorded.')}/><SecondaryButton label="Close unresolved" disabled={!reason.trim()} onPress={()=>void run(()=>getRepository().call('POST',`/requests/${r.id}/close`,{reason}))}/></>}{data.cards.map(k=><Banner green key={k.id}>Saved to your hub so nobody has to ask again.<LinkButton label="Open the saved answer" onPress={()=>router.push(`/card/${k.id}` as Href)}/>{user?.id===r.author_id&&<LinkButton label="Don’t save this" onPress={()=>void run(()=>getRepository().call('POST',`/requests/${r.id}/privacy`),'The saved card was removed.')}/>}</Banner>)}</Screen>;}
-export function AnswerCard(){const {id}=useLocalSearchParams<{id:string}>();const {run}=useAction();const {data}=useResource(async()=>{const card=await getRepository().call<KnowledgeItem>('GET',`/knowledge/${id}`);if(card.space_id!==useSession.getState().active)await useSession.getState().switchSpace(card.space_id);return card;},[id]);return <Screen title="Saved answer" back>{data?<><Heading>{data.title}</Heading><Row><Pill tone={data.status==='VERIFIED'?'resolved':'amber'}>{data.status.toLowerCase()}</Pill><Pill>{data.retrieval_hits} times found</Pill></Row><ViewGap/><Card><Copy>{data.body_markdown}</Copy></Card><Copy small muted>{data.origin==='AUTHORED'?'Written by':'Saved from a resolved request ·'} {data.created_by??'the community'} · {new Date(data.created_at).toLocaleDateString()}</Copy><Copy small muted>Contributors: {data.contributor_ids.join(', ')||'Course community'}</Copy>{data.url&&<SecondaryButton label="Open source link ↗" onPress={()=>void Linking.openURL(data.url!)}/ >}{data.source_request_id&&<SecondaryButton label="Open source thread" onPress={()=>router.push(`/request/${data.source_request_id}` as Href)}/>}<SecondaryButton label="This doesn’t answer it" onPress={()=>void run(async()=>{await getRepository().call('POST',`/knowledge/${id}/flag`);router.push({pathname:'/(student)/ask',params:{prefill:data.title}});})}/></>:<Loading/>}</Screen>;}
-function ViewGap(){return <Copy>{' '}</Copy>;}
+import React, { useState } from "react";
+import { Linking } from "react-native";
+import { router, useLocalSearchParams, type Href } from "expo-router";
+import type { KnowledgeItem } from "@peerloop/core";
+import {
+  AgentQuote,
+  Banner,
+  Card,
+  Copy,
+  Field,
+  Heading,
+  LinkButton,
+  Loading,
+  NoteText,
+  Pill,
+  PrimaryButton,
+  Row,
+  Screen,
+  SecondaryButton,
+  Section,
+  Stepper,
+  useAction,
+  useResource,
+} from "../components";
+import { getRepository } from "../lib/repo";
+import { useRole, useSession } from "../store/session";
+export function ThreadScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const user = useSession((s) => s.user),
+    role = useRole(),
+    [body, setBody] = useState(""),
+    [reason, setReason] = useState("");
+  const { run, busy } = useAction();
+  const { data } = useResource(async () => {
+    const thread = await getRepository().getRequest(id);
+    if (thread.request.space_id !== useSession.getState().active)
+      await useSession.getState().switchSpace(thread.request.space_id);
+    return thread;
+  }, [id]);
+  if (!data)
+    return (
+      <Screen title="Request" back>
+        <Loading />
+      </Screen>
+    );
+  const r = data.request,
+    manage = role === "CR" || role === "INSTRUCTOR",
+    canAccept = user?.id === r.author_id || manage,
+    closed = ["RESOLVED", "CLOSED_UNRESOLVED"].includes(r.state);
+  return (
+    <Screen title="Request" back>
+      <Heading>{r.normalised_question}</Heading>
+      <Row>
+        <Pill>{r.priority}</Pill>
+        <Pill tone={r.state === "RESOLVED" ? "resolved" : "flare"}>
+          {r.state.toLowerCase().replaceAll("_", " ")}
+        </Pill>
+      </Row>
+      <Stepper request={r} />
+      {r.request_class === "AUTHORITY" && (
+        <NoteText>
+          This needs approval, not knowledge, so it skipped the peer stages
+          entirely and went straight to your CR.
+        </NoteText>
+      )}
+      {r.merged_count > 1 && (
+        <Banner>
+          {r.merged_count} people are waiting on this thread. Everyone gets the
+          accepted answer together.
+        </Banner>
+      )}
+      {r.held_reason && <Banner>Clock held: {r.held_reason}</Banner>}
+      <Section title="How it got here" />
+      {data.timeline.map((e) => (
+        <NoteText key={e.id}>
+          {e.reason}
+          {"\n"}
+          {new Date(e.at).toLocaleString()}
+        </NoteText>
+      ))}
+      <Section title="Answers & replies" />
+      {!data.messages.length && (
+        <NoteText>
+          No answer yet. PeerLoop will keep this moving through the hub’s
+          escalation policy.
+        </NoteText>
+      )}
+      {data.messages.map((m) => (
+        <React.Fragment key={m.id}>
+          {m.author_type === "AGENT" ? (
+            <AgentQuote
+              body={m.body_markdown}
+              sources={m.cited_item_ids}
+              onSource={(id) => router.push(`/card/${id}` as Href)}
+            />
+          ) : (
+            <Card>
+              <Copy small bold>
+                {m.author_type === 'SYSTEM' ? 'PeerLoop · close-out summary' : m.author_id === user?.id ? "You" : "Community member"}
+                {m.is_accepted ? " · accepted answer" : ""}
+              </Copy>
+              <Copy>{m.body_markdown}</Copy>
+              <Copy small muted>
+                {new Date(m.created_at).toLocaleString()}
+              </Copy>
+            </Card>
+          )}
+          {canAccept && !closed && m.author_type !== 'SYSTEM' && (
+            <SecondaryButton
+              label="Accept this answer"
+              disabled={busy}
+              onPress={() =>
+                void run(
+                  () => getRepository().acceptAnswer(r.id, m.id),
+                  "Resolved. The useful answer stays in the hub.",
+                )
+              }
+            />
+          )}
+        </React.Fragment>
+      ))}
+      {!closed && (
+        <>
+          <Field
+            label="Add a useful answer"
+            value={body}
+            onChangeText={setBody}
+            multiline
+            placeholder="Share what you know, and include a source if you have one."
+          />
+          <PrimaryButton
+            label={role === "INSTRUCTOR" ? "Answer & publish" : "Send answer"}
+            disabled={busy || !body.trim()}
+            onPress={() =>
+              void run(async () => {
+                await getRepository().postMessage(
+                  r.id,
+                  body,
+                  role === "INSTRUCTOR",
+                );
+                setBody("");
+              }, "Your answer is in the thread.")
+            }
+          />
+          <SecondaryButton
+            label="I’m looking into this"
+            onPress={() =>
+              void run(
+                () => getRepository().call("POST", `/requests/${r.id}/claim`),
+                "The clock now gives you a little room.",
+              )
+            }
+          />
+          {!data.messages.length && (
+            <PrimaryButton
+              label="Mark as resolved"
+              disabled
+              onPress={() => {}}
+            />
+          )}
+        </>
+      )}
+      {user?.id === r.author_id && !manage && !closed && <>
+        <Field label="Withdrawal reason" value={reason} onChangeText={setReason}/>
+        <SecondaryButton label="Withdraw request" disabled={!reason.trim() || busy} onPress={()=>void run(()=>getRepository().call('POST',`/requests/${r.id}/close`,{reason}))}/>
+      </>}
+      {manage && !closed && (
+        <>
+          <Section title="Class representative controls" />
+          <Field
+            label="Hold or close reason"
+            value={reason}
+            onChangeText={setReason}
+          />
+          <SecondaryButton
+            label={r.held_reason ? "Resume clock" : "Hold request"}
+            disabled={!r.held_reason && !reason.trim()}
+            onPress={() =>
+              void run(() =>
+                r.held_reason
+                  ? getRepository().call("POST", `/requests/${r.id}/resume`)
+                  : getRepository().holdRequest(r.id, reason),
+              )
+            }
+          />
+          <SecondaryButton
+            label="Escalate now"
+            onPress={() =>
+              void run(
+                () => getRepository().escalateNow(r.id),
+                "The next step has been recorded.",
+              )
+            }
+          />
+          <SecondaryButton
+            label="Close unresolved"
+            disabled={!reason.trim()}
+            onPress={() =>
+              void run(() =>
+                getRepository().call("POST", `/requests/${r.id}/close`, {
+                  reason,
+                }),
+              )
+            }
+          />
+          <Section title="Move to another hub" />
+          {useSession.getState().spaces.filter(s=>s.id!==r.space_id && ['CR','INSTRUCTOR'].includes(s.role)).map(s=><SecondaryButton key={s.id} label={`Move to ${s.code}`} disabled={busy || r.merged_count>1} onPress={()=>void run(async()=>{
+            const moved=await getRepository().call<{id:string}>('POST',`/requests/${r.id}/move`,{space_id:s.id});
+            router.replace(`/thread/${moved.id}` as Href);
+          },'Original thread closed; request reopened in the selected hub.')}/>)}
+        </>
+      )}
+      {data.cards.map((k) => (
+        <Banner green key={k.id}>
+          Saved to your hub so nobody has to ask again.
+          <LinkButton
+            label="Open the saved answer"
+            onPress={() => router.push(`/card/${k.id}` as Href)}
+          />
+          {user?.id === r.author_id && (
+            <LinkButton
+              label="Don’t save this"
+              onPress={() =>
+                void run(
+                  () =>
+                    getRepository().call("POST", `/requests/${r.id}/privacy`),
+                  "The saved card was removed.",
+                )
+              }
+            />
+          )}
+        </Banner>
+      ))}
+    </Screen>
+  );
+}
+export function AnswerCard() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { run } = useAction();
+  const { data } = useResource(async () => {
+    const card = await getRepository().call<KnowledgeItem>(
+      "GET",
+      `/knowledge/${id}`,
+    );
+    if (card.space_id !== useSession.getState().active)
+      await useSession.getState().switchSpace(card.space_id);
+    return card;
+  }, [id]);
+  return (
+    <Screen title="Saved answer" back>
+      {data ? (
+        <>
+          <Heading>{data.title}</Heading>
+          <Row>
+            <Pill tone={data.status === "VERIFIED" ? "resolved" : "amber"}>
+              {data.status.toLowerCase()}
+            </Pill>
+            <Pill>{data.retrieval_hits} times found</Pill>
+          </Row>
+          <ViewGap />
+          <Card>
+            <Copy>{data.body_markdown}</Copy>
+          </Card>
+          <Copy small muted>
+            {data.origin === "AUTHORED"
+              ? "Written by"
+              : "Saved from a resolved request ·"}{" "}
+            {data.created_by ?? "the community"} ·{" "}
+            {new Date(data.created_at).toLocaleDateString()}
+          </Copy>
+          <Copy small muted>
+            Contributors:{" "}
+            {data.contributor_ids.join(", ") || "Course community"}
+          </Copy>
+          {data.url && (
+            <SecondaryButton
+              label="Open source link ↗"
+              onPress={() => void Linking.openURL(data.url!)}
+            />
+          )}
+          {data.source_request_id && (
+            <SecondaryButton
+              label="Open source thread"
+              onPress={() =>
+                router.push(`/request/${data.source_request_id}` as Href)
+              }
+            />
+          )}
+          <SecondaryButton
+            label="This doesn’t answer it"
+            onPress={() =>
+              void run(async () => {
+                await getRepository().call("POST", `/knowledge/${id}/flag`);
+                router.push({
+                  pathname: "/(student)/ask",
+                  params: { prefill: data.title },
+                });
+              })
+            }
+          />
+        </>
+      ) : (
+        <Loading />
+      )}
+    </Screen>
+  );
+}
+function ViewGap() {
+  return <Copy> </Copy>;
+}
