@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PeerLoop — MVP UI walkthrough v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14151f; --paper:#f5f2ea; --panel:#ffffff; --panel-2:#efece1;
+    --flare:#ff5a2e; --flare-ink:#8a2e12; --flare-tint:#ffe6db;
+    --resolved:#1f7a5c; --resolved-ink:#1f7a5c; --resolved-tint:#e2f2ea;
+    --indigo:#4b5bd6; --indigo-ink:#2f3a9c; --indigo-tint:#e5e7fb;
+    --amber:#b07500; --amber-tint:#fcefd2;
+    --muted:#726d5f; --line:#e6e0cf;
+    --font-display:'Fraunces', serif; --font-body:'Instrument Sans', sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#f1efe6; --paper:#0e0e13; --panel:#1a1a22; --panel-2:#232330;
+      --flare:#ff7c52; --flare-ink:#ffd6c4; --flare-tint:#3a2216;
+      --resolved:#4bd8a5; --resolved-ink:#4bd8a5; --resolved-tint:#153228;
+      --indigo:#8c97f2; --indigo-ink:#c6ccff; --indigo-tint:#20233f;
+      --amber:#e9b64a; --amber-tint:#3a2e12;
+      --muted:#a29c8c; --line:#2c2c3a;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper); color:var(--ink); font-family:var(--font-body);
+    padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:44px 24px 72px;}
+  .masthead{margin-bottom:26px; max-width:680px;}
+  .masthead .eyebrow{font-size:13px; color:var(--muted); display:block; margin-bottom:8px;}
+  .masthead h1{font-family:var(--font-display); font-style:italic; font-weight:500; font-size:clamp(26px,4vw,38px); margin:0 0 10px; letter-spacing:-0.01em; line-height:1.15;}
+  .masthead p{margin:0; color:var(--muted); line-height:1.55; font-size:15px;}
+
+  .switcher{display:inline-flex; padding:4px; background:var(--panel-2); border-radius:999px; margin-bottom:30px; gap:2px; flex-wrap:wrap;}
+  .switcher button{border:none; background:transparent; font-family:var(--font-body); font-size:13.5px; font-weight:500; padding:9px 18px; border-radius:999px; color:var(--muted); cursor:pointer;}
+  .switcher button.active{background:var(--panel); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.1);}
+
+  .stage{display:flex; gap:48px; align-items:flex-start; flex-wrap:wrap;}
+
+  .device{
+    width:min(390px, 100%); flex-shrink:0; background:var(--panel);
+    border-radius:38px; border:1px solid var(--line); overflow:hidden;
+    box-shadow:0 40px 70px -35px rgba(20,14,4,.4);
+    display:flex; flex-direction:column; height:820px; position:relative;
+  }
+  .device__bar{height:26px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .device__bar span{width:80px; height:5px; border-radius:3px; background:var(--line);}
+
+  .screens{flex:1; overflow-y:auto; position:relative;}
+  .screen{display:none; flex-direction:column; padding:6px 20px 22px; min-height:100%; position:relative;}
+  .screen.active{display:flex;}
+
+  .tabbar{display:none; border-top:1px solid var(--line); flex-shrink:0; padding:9px 4px calc(9px + env(safe-area-inset-bottom,0px)); background:var(--panel);}
+  .tabbar.active{display:flex;}
+  .tabbar button{flex:1; border:none; background:transparent; display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--muted); font-family:var(--font-body); font-size:10px; font-weight:500; cursor:pointer; padding:4px 0;}
+  .tabbar button svg{width:19px;height:19px;}
+  .tabbar button.active{color:var(--flare);}
+
+  .topline{display:flex; align-items:center; justify-content:space-between; padding:10px 2px 14px; gap:10px;}
+  .topline h2{font-size:16.5px; margin:0; font-weight:600;}
+  .wordmark{display:flex; align-items:center; gap:7px; font-family:var(--font-display); font-style:italic; font-weight:600; font-size:19px;}
+  .wordmark .dot{width:9px; height:9px; border-radius:50%; background:var(--flare); flex-shrink:0;}
+  .icon-row{display:flex; gap:8px;}
+  .icon-btn{width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--panel); display:flex; align-items:center; justify-content:center; color:var(--ink); cursor:pointer; position:relative; flex-shrink:0;}
+  .icon-btn svg{width:17px; height:17px;}
+  .icon-btn .badge-dot{position:absolute; top:6px; right:7px; width:7px; height:7px; border-radius:50%; background:var(--flare); border:1.5px solid var(--panel);}
+  .back-row{display:flex; align-items:center; gap:10px; padding:10px 2px 16px;}
+  .back-row .icon-btn{border:none; background:transparent; padding:0; width:24px;}
+  .back-row h2{font-size:16px; font-weight:600; margin:0;}
+
+  .greeting h2{font-family:var(--font-display); font-weight:500; font-size:22px; margin:0 0 4px;}
+  .greeting p{margin:0 0 18px; color:var(--muted); font-size:13.5px;}
+
+  .seg{display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;}
+  .seg button{border:1px solid var(--line); background:var(--panel); color:var(--muted); font-family:var(--font-body); font-size:12.5px; font-weight:500; padding:7px 13px; border-radius:999px; cursor:pointer;}
+  .seg button.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+
+  .card{border:1px solid var(--line); border-radius:16px; padding:14px 15px; margin-bottom:10px; background:var(--panel); cursor:pointer;}
+  .card h3{margin:0 0 8px; font-size:14.5px; font-weight:600; line-height:1.35;}
+  .tagrow{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; align-items:center;}
+  .tag{font-size:11px; color:var(--muted); background:var(--panel-2); padding:3px 9px; border-radius:999px;}
+  .spacechip{font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:999px; display:inline-flex; align-items:center; gap:5px; letter-spacing:.02em;}
+  .spacechip::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor;}
+  .sc-flare{background:var(--flare-tint); color:var(--flare-ink);}
+  .sc-indigo{background:var(--indigo-tint); color:var(--indigo-ink);}
+  .card__footer{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .pill{font-size:11px; font-weight:600; padding:4px 10px; border-radius:999px;}
+  .pill--flare{background:var(--flare-tint); color:var(--flare-ink);}
+  .pill--resolved{background:var(--resolved-tint); color:var(--resolved-ink);}
+  .pill--amber{background:var(--amber-tint); color:var(--amber);}
+  .pill--quiet{background:var(--panel-2); color:var(--muted);}
+  .meta{font-size:11px; color:var(--muted);}
+
+  .fab{position:absolute; right:18px; bottom:18px; background:var(--flare); color:#fff; border:none; border-radius:999px; padding:13px 20px 13px 16px; display:flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:600; font-size:13.5px; cursor:pointer; box-shadow:0 12px 24px -10px rgba(255,90,46,.55); z-index:4;}
+  .fab svg{width:16px; height:16px;}
+
+  .field-label{font-size:12px; font-weight:600; color:var(--muted); margin:0 0 8px;}
+  textarea.field{width:100%; border:1px solid var(--line); border-radius:14px; padding:13px 14px; font-family:var(--font-body); font-size:14px; color:var(--ink); background:var(--panel-2); resize:none; min-height:74px;}
+  .target-row{display:flex; align-items:center; gap:8px; margin:10px 0 4px; flex-wrap:wrap;}
+  .target-btn{display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:7px 12px; font-family:var(--font-body); font-size:12.5px; font-weight:600; color:var(--ink); cursor:pointer;}
+  .target-btn svg{width:12px; height:12px; color:var(--muted);}
+  .target-hint{font-size:11.5px; color:var(--muted);}
+  .chip-row{display:flex; gap:6px; flex-wrap:wrap; margin:12px 0 14px;}
+  .chip{font-size:12px; background:var(--panel); border:1px solid var(--line); padding:5px 11px; border-radius:999px; color:var(--ink);}
+  .chip--ai{border-style:dashed;}
+  .btn-primary{width:100%; background:var(--ink); color:var(--paper); border:none; border-radius:14px; padding:13px; font-family:var(--font-body); font-weight:600; font-size:14px; cursor:pointer;}
+  .btn-primary:disabled{opacity:.55;}
+  .btn-secondary{width:100%; background:transparent; color:var(--ink); border:1px solid var(--line); border-radius:14px; padding:12px; font-family:var(--font-body); font-weight:600; font-size:13.5px; cursor:pointer; margin-top:8px;}
+  .loading-row{display:flex; align-items:center; gap:10px; padding:16px 2px; color:var(--muted); font-size:13.5px;}
+  .spinner{width:16px; height:16px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--flare); animation:spin .8s linear infinite; flex-shrink:0;}
+  @media (prefers-reduced-motion: reduce){ .spinner{animation:none;} }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .outcome{display:none; margin-top:6px;}
+  .outcome.active{display:block;}
+  .kicker{font-size:11.5px; font-weight:600; color:var(--muted); margin-bottom:8px;}
+  .answer-card{border:1px solid var(--line); border-radius:14px; padding:14px; background:var(--resolved-tint); margin-bottom:6px;}
+  .answer-card p{margin:0 0 10px; font-size:13.5px; line-height:1.5;}
+  .source-line{font-size:11.5px; color:var(--resolved-ink); font-weight:600;}
+  .route-card{border:1px solid var(--line); border-radius:14px; padding:14px; background:var(--panel-2); margin-bottom:6px;}
+  .route-card p{margin:0 0 10px; font-size:13px; color:var(--muted); line-height:1.5;}
+  .route-card b{color:var(--ink);}
+  .prio-row{display:flex; gap:6px; margin:10px 0 12px;}
+  .prio-row button{flex:1; border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:8px 4px; font-size:11.5px; font-weight:600; color:var(--muted); cursor:pointer; font-family:var(--font-body);}
+  .prio-row button.active{background:var(--flare); border-color:var(--flare); color:#fff;}
+  .prio-row button:disabled{opacity:.4; cursor:not-allowed;}
+  .toggle-link{background:none; border:none; color:var(--muted); font-size:12px; text-decoration:underline; cursor:pointer; padding:6px 0; font-family:var(--font-body);}
+
+  .stepper{display:flex; align-items:flex-start; margin:6px 0 16px;}
+  .step{flex:1; display:flex; flex-direction:column; align-items:center; position:relative;}
+  .step::before{content:""; position:absolute; top:11px; left:-50%; width:100%; height:2px; background:var(--line); z-index:0;}
+  .step:first-child::before{display:none;}
+  .step.done::before, .step.current::before{background:var(--resolved);}
+  .step .dot{width:23px; height:23px; border-radius:50%; background:var(--panel-2); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; z-index:1; color:var(--muted);}
+  .step .dot svg{width:11px; height:11px;}
+  .step.done .dot{background:var(--resolved); border-color:var(--resolved); color:#fff;}
+  .step.current .dot{background:var(--flare); border-color:var(--flare);}
+  .step.skipped .dot{background:transparent; border-style:dashed;}
+  .step span.lbl{font-size:9.5px; color:var(--muted); margin-top:6px; text-align:center; line-height:1.2;}
+  .step.current span.lbl{color:var(--ink); font-weight:600;}
+
+  .note-text{font-size:12.5px; color:var(--muted); line-height:1.5; margin:0 0 12px; padding:11px 13px; background:var(--panel-2); border-radius:12px;}
+  .note-text b{color:var(--ink);}
+  .banner{font-size:12.5px; line-height:1.5; padding:11px 13px; border-radius:12px; background:var(--flare-tint); color:var(--flare-ink); margin-bottom:12px; font-weight:500;}
+  .banner--green{background:var(--resolved-tint); color:var(--resolved-ink);}
+  .msg{display:flex; gap:9px; margin-bottom:14px;}
+  .avatar{width:30px; height:30px; border-radius:50%; background:var(--ink); color:var(--paper); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; flex-shrink:0;}
+  .avatar--ai{background:var(--flare); color:#fff;}
+  .msg__body{flex:1;}
+  .msg__body .who{font-size:12px; font-weight:600; margin-bottom:2px;}
+  .msg__body .who span{font-weight:400; color:var(--muted);}
+  .msg__body p{margin:0; font-size:13px; line-height:1.5;}
+  .msg__body .time{font-size:10.5px; color:var(--muted); margin-top:3px;}
+
+  .search-field{display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:999px; padding:10px 14px; background:var(--panel-2); margin-bottom:18px;}
+  .search-field svg{width:15px; height:15px; color:var(--muted); flex-shrink:0;}
+  .search-field input{border:none; background:transparent; outline:none; font-family:var(--font-body); font-size:13.5px; color:var(--ink); width:100%;}
+  .section-head{display:flex; align-items:center; justify-content:space-between; margin:6px 0 8px; gap:10px;}
+  .section-label{font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.04em; margin:0;}
+  .link-btn{background:none; border:none; font-family:var(--font-body); font-size:11.5px; font-weight:600; color:var(--flare); cursor:pointer; display:inline-flex; align-items:center; gap:3px; padding:2px 0;}
+  .ref-row{display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); cursor:pointer;}
+  .ref-row:last-child{border-bottom:none;}
+  .ref-row .t{font-size:13.5px; font-weight:600; margin:0 0 3px; display:flex; align-items:center; gap:6px;}
+  .ref-row .c{font-size:11.5px; color:var(--muted); margin:0;}
+  .ref-row svg{width:14px; height:14px; color:var(--muted); flex-shrink:0; margin-top:2px;}
+  .dot-mark{width:7px; height:7px; border-radius:50%; flex-shrink:0;}
+  .dot-verified{background:var(--resolved);}
+  .dot-unverified{background:var(--amber);}
+
+  .hubswitch{display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid var(--line); border-radius:14px; padding:11px 13px; background:var(--panel-2); margin-bottom:14px; cursor:pointer; width:100%; font-family:var(--font-body); text-align:left; color:var(--ink);}
+  .hubswitch .hs-code{font-size:13.5px; font-weight:700; margin:0 0 2px;}
+  .hubswitch .hs-sub{font-size:11.5px; color:var(--muted); margin:0;}
+  .hubswitch svg{width:15px; height:15px; color:var(--muted); flex-shrink:0;}
+  .hub-pill{display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); background:var(--panel-2); border-radius:999px; padding:5px 10px 5px 6px; font-family:var(--font-body); cursor:pointer; flex-shrink:0;}
+  .hub-pill svg{width:12px; height:12px; color:var(--muted); flex-shrink:0;}
+  .hub-pill:active{opacity:.7;}
+  .chip--on{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .dupe-warn{font-size:12px; line-height:1.5; color:var(--muted); background:var(--resolved-tint); border-radius:12px; padding:10px 12px; margin-top:10px;}
+  .dupe-warn b{color:var(--resolved-ink);}
+  .input-line{width:100%; border:1px solid var(--line); border-radius:12px; padding:11px 13px; font-family:var(--font-body); font-size:13.5px; background:var(--panel-2); color:var(--ink);}
+
+  .avatar-lg{width:56px; height:56px; border-radius:50%; background:var(--ink); color:var(--paper); display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:600; margin:6px 0 12px;}
+  .profile-name{font-size:17px; font-weight:600; margin:0 0 2px;}
+  .profile-sub{font-size:12.5px; color:var(--muted); margin:0 0 18px;}
+  .stat-row{display:flex; gap:8px; margin-bottom:16px;}
+  .stat{flex:1; border:1px solid var(--line); border-radius:14px; padding:12px 8px; text-align:center;}
+  .stat .n{font-family:var(--font-display); font-weight:600; font-size:19px; display:block;}
+  .stat .l{font-size:9.5px; color:var(--muted); margin-top:2px; display:block; line-height:1.3;}
+  .badge-card{border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px;}
+  .badge-card .name{font-size:13.5px; font-weight:600; margin:0 0 5px;}
+  .badge-card p{font-size:12px; color:var(--muted); margin:0; line-height:1.5;}
+  .toggle-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0;}
+  .toggle-row p{font-size:12.5px; margin:0; max-width:238px; line-height:1.4;}
+  .switch{width:38px; height:22px; border-radius:999px; background:var(--panel-2); border:1px solid var(--line); position:relative; flex-shrink:0; cursor:pointer;}
+  .switch::after{content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:var(--panel); box-shadow:0 1px 2px rgba(0,0,0,.25); transition:transform .15s;}
+  .switch.on{background:var(--flare); border-color:var(--flare);}
+  .switch.on::after{transform:translateX(16px);}
+
+  .stat-strip{font-size:12.5px; color:var(--muted); background:var(--panel-2); border-radius:12px; padding:11px 13px; margin-bottom:14px; line-height:1.5;}
+  .stat-strip b{color:var(--ink);}
+  .queue-card{border:1px solid var(--line); border-radius:16px; padding:13px 14px; margin-bottom:10px;}
+  .queue-card h3{margin:0 0 7px; font-size:13.5px; font-weight:600; line-height:1.35;}
+  .queue-card .why{font-size:11.5px; color:var(--muted); margin:0 0 9px; line-height:1.45;}
+  .queue-card .btn-row{display:flex; gap:7px; margin-top:10px; flex-wrap:wrap;}
+  .queue-card .btn-row button{flex:1; min-width:78px; border-radius:10px; padding:9px 6px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:var(--font-body); border:1px solid var(--line); background:var(--panel); color:var(--ink);}
+  .btn-approve{background:var(--ink) !important; color:var(--paper) !important; border-color:var(--ink) !important;}
+  .agent-quote{font-size:12px; line-height:1.5; border-left:2px solid var(--flare); padding:2px 0 2px 10px; margin:0 0 9px; color:var(--ink);}
+  .pin-panel{border:1px dashed var(--line); border-radius:14px; padding:14px; margin-top:16px;}
+  .pin-panel .field-label{margin-bottom:6px;}
+  .pin-panel input{width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-family:var(--font-body); font-size:13px; background:var(--panel-2); margin-bottom:8px; color:var(--ink);}
+  .pin-panel .hint{font-size:11px; color:var(--muted); margin:0 0 10px; line-height:1.5;}
+  .pin-panel button{width:100%; background:var(--ink); color:var(--paper); border:none; border-radius:10px; padding:10px; font-weight:600; font-size:12.5px; cursor:pointer; font-family:var(--font-body);}
+
+  .divider-note{display:flex; align-items:center; gap:8px; margin:10px 0; font-size:10.5px; color:var(--muted); font-weight:600;}
+  .divider-note::before,.divider-note::after{content:""; flex:1; height:1px; background:var(--line);}
+
+  .preset-row{display:flex; gap:7px; margin-bottom:12px;}
+  .preset-row button{flex:1; border:1px solid var(--line); background:var(--panel); border-radius:12px; padding:10px 6px; font-family:var(--font-body); font-size:12px; font-weight:600; color:var(--muted); cursor:pointer;}
+  .preset-row button.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+  .dwell-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--line);}
+  .dwell-row .dl{font-size:13px; font-weight:600; margin:0 0 2px;}
+  .dwell-row .ds{font-size:11px; color:var(--muted); margin:0;}
+  .dwell-input{display:flex; align-items:center; gap:5px; flex-shrink:0;}
+  .dwell-input input{width:56px; border:1px solid var(--line); border-radius:9px; padding:7px 8px; font-family:var(--font-body); font-size:13px; background:var(--panel-2); color:var(--ink); text-align:right;}
+  .dwell-input span{font-size:11.5px; color:var(--muted);}
+  .locked-banner{font-size:12px; background:var(--amber-tint); color:var(--amber); padding:10px 12px; border-radius:12px; margin-bottom:12px; font-weight:600; line-height:1.45;}
+
+  .kpi-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;}
+  .kpi{border:1px solid var(--line); border-radius:14px; padding:12px;}
+  .kpi .n{font-family:var(--font-display); font-weight:600; font-size:21px; display:block; line-height:1.1;}
+  .kpi .l{font-size:10.5px; color:var(--muted); margin-top:4px; display:block; line-height:1.3;}
+  .kpi .d{font-size:10.5px; font-weight:600; margin-top:4px; display:block;}
+  .d-up{color:var(--resolved-ink);} .d-down{color:var(--flare-ink);}
+
+  .bar-row{display:flex; align-items:center; gap:9px; margin-bottom:9px;}
+  .bar-row .bl{font-size:12px; width:104px; flex-shrink:0; line-height:1.3;}
+  .bar-track{flex:1; height:8px; border-radius:999px; background:var(--panel-2); overflow:hidden;}
+  .bar-fill{height:100%; border-radius:999px; background:var(--flare);}
+  .bar-fill.alt{background:var(--indigo);}
+  .bar-row .bv{font-size:11.5px; color:var(--muted); width:30px; text-align:right; flex-shrink:0;}
+
+  .list-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 0; border-bottom:1px solid var(--line); cursor:pointer;}
+  .list-row:last-child{border-bottom:none;}
+  .list-row .lt{font-size:13.5px; font-weight:600; margin:0 0 3px;}
+  .list-row .lc{font-size:11.5px; color:var(--muted); margin:0;}
+  .health{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
+  .h-green{background:var(--resolved);} .h-amber{background:var(--amber);} .h-red{background:var(--flare);}
+
+  .form-row{margin-bottom:11px;}
+  .form-row label{font-size:11.5px; font-weight:600; color:var(--muted); display:block; margin-bottom:5px;}
+  .form-row input, .form-row select{width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-family:var(--font-body); font-size:13px; background:var(--panel-2); color:var(--ink);}
+  .two-col{display:flex; gap:8px;} .two-col .form-row{flex:1;}
+
+  /* bottom sheet */
+  .sheet-scrim{position:absolute; inset:0; background:rgba(10,8,4,.42); opacity:0; pointer-events:none; transition:opacity .18s; z-index:9;}
+  .sheet-scrim.show{opacity:1; pointer-events:auto;}
+  .sheet{position:absolute; left:0; right:0; bottom:0; background:var(--panel); border-radius:22px 22px 0 0; padding:8px 18px calc(20px + env(safe-area-inset-bottom,0px)); transform:translateY(102%); transition:transform .22s cubic-bezier(.3,.8,.4,1); z-index:10; max-height:82%; overflow-y:auto;}
+  .sheet.show{transform:translateY(0);}
+  .sheet .grab{width:38px; height:4px; border-radius:3px; background:var(--line); margin:4px auto 14px;}
+  .sheet h4{font-size:14px; margin:0 0 3px; font-weight:600;}
+  .sheet .sub{font-size:11.5px; color:var(--muted); margin:0 0 14px;}
+  .space-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 0; border-bottom:1px solid var(--line); cursor:pointer;}
+  .space-row:last-of-type{border-bottom:none;}
+  .space-row .sl{display:flex; align-items:center; gap:10px;}
+  .space-row .st{font-size:13.5px; font-weight:600; margin:0 0 2px;}
+  .space-row .ss{font-size:11.5px; color:var(--muted); margin:0;}
+  .space-row .check{color:var(--flare); font-weight:700; font-size:15px;}
+  .sheet-cta{width:100%; margin-top:14px; border:1px dashed var(--line); background:transparent; border-radius:12px; padding:11px; font-family:var(--font-body); font-size:12.5px; font-weight:600; color:var(--ink); cursor:pointer;}
+
+  .toast{position:absolute; left:20px; right:20px; bottom:88px; background:var(--ink); color:var(--paper); padding:12px 15px; border-radius:12px; font-size:12.5px; text-align:center; opacity:0; transform:translateY(8px); transition:opacity .2s, transform .2s; pointer-events:none; z-index:12;}
+  .toast.show{opacity:1; transform:translateY(0);}
+
+  .notes{flex:1; min-width:280px; padding-top:6px;}
+  .notes h3{font-family:var(--font-display); font-weight:500; font-style:italic; font-size:19px; margin:0 0 6px;}
+  .notes .nsub{font-size:13px; color:var(--muted); margin:0 0 14px; line-height:1.5;}
+  .notes ul{margin:0; padding:0; list-style:none;}
+  .notes li{display:flex; gap:12px; padding:13px 0; border-top:1px solid var(--line);}
+  .notes li:first-child{border-top:none;}
+  .notes li .num{font-family:var(--font-display); font-style:italic; color:var(--flare); font-size:15px; flex-shrink:0; width:20px;}
+  .notes li p{margin:0; font-size:13.5px; line-height:1.55; color:var(--ink);}
+  .notes li b{font-weight:600;}
+  .noteblock{display:none;} .noteblock.active{display:block;}
+
+  @media (max-width:820px){ .stage{gap:30px;} .device{margin:0 auto;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <span class="eyebrow">BatteryLowInteractive — PeerLoop · MVP build walkthrough</span>
+    <h1>Four people, one loop.</h1>
+    <p>The MVP is multi-space: a student belongs to several hubs, asks into one of them, and the request either gets answered from what PeerLoop already knows or walks an escalation ladder the class rep controls. Switch personas below to see the same request from all four sides.</p>
+  </div>
+
+  <div class="switcher" id="switcher">
+    <button class="active" data-persona="student">Student</button>
+    <button data-persona="cr">Class rep</button>
+    <button data-persona="instructor">Course instructor</button>
+    <button data-persona="dept">Department</button>
+  </div>
+
+  <div class="stage">
+    <div class="device">
+      <div class="device__bar"><span></span></div>
+
+      <div class="screens" id="screens">
+
+        <!-- ============ STUDENT : HOME ============ -->
+        <section class="screen active" data-persona="student" data-screen="s-home">
+          <div class="topline">
+            <div class="wordmark"><span class="dot"></span>PeerLoop</div>
+            <div class="icon-row">
+              <div class="icon-btn" onclick="toast('Global search across all your hubs.')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></div>
+              <div class="icon-btn"><span class="badge-dot"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 12 6 8Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+            </div>
+          </div>
+          <div class="greeting">
+            <h2>Hi Arisha</h2>
+            <p>2 open across 2 hubs · 3 people are waiting on you</p>
+          </div>
+          <div class="seg" data-segset="home">
+            <button class="active" data-seg="open">Open (2)</button>
+            <button data-seg="resolved">Resolved (6)</button>
+            <button data-seg="helping">Helping (3)</button>
+          </div>
+
+          <div data-segpanel="open">
+            <div class="card" data-goto="s-thread-a">
+              <h3>Anyone have the Week 6 slides?</h3>
+              <div class="tagrow"><span class="spacechip sc-flare">CSE 4790</span><span class="tag">Materials</span><span class="tag">3 following</span></div>
+              <div class="card__footer"><span class="pill pill--flare">Widened to batch</span><span class="meta">Updated 20m ago</span></div>
+            </div>
+            <div class="card" data-goto="s-thread-b">
+              <h3>Can we get a Lab 3 deadline extension?</h3>
+              <div class="tagrow"><span class="spacechip sc-indigo">CSE 4712</span><span class="tag">Needs approval</span></div>
+              <div class="card__footer"><span class="pill pill--flare">With your CR</span><span class="meta">Updated 1h ago</span></div>
+            </div>
+          </div>
+
+          <div data-segpanel="resolved" style="display:none;">
+            <div class="card" data-goto="s-card">
+              <h3>How is the final grade weighted?</h3>
+              <div class="tagrow"><span class="spacechip sc-flare">CSE 4790</span><span class="tag">Academic help</span></div>
+              <div class="card__footer"><span class="pill pill--resolved">Resolved · saved to hub</span><span class="meta">2 days ago</span></div>
+            </div>
+            <div class="card">
+              <h3>Where's the proposal submission link?</h3>
+              <div class="tagrow"><span class="spacechip sc-indigo">CSE 4712</span><span class="tag">Information</span></div>
+              <div class="card__footer"><span class="pill pill--resolved">Answered instantly</span><span class="meta">5 days ago</span></div>
+            </div>
+          </div>
+
+          <div data-segpanel="helping" style="display:none;">
+            <p class="note-text">You were picked for these because you've answered questions with these tags before. <b>Nobody else outside this shortlist has been notified yet.</b></p>
+            <div class="card">
+              <h3>What's the file format for the ITR report?</h3>
+              <div class="tagrow"><span class="spacechip sc-flare">CSE 4790</span><span class="tag">Matched: submission, format</span></div>
+              <div class="card__footer"><span class="pill pill--quiet">Sent to 8 people · 2h ago</span><span class="meta">Widens in 4h</span></div>
+            </div>
+            <div class="card">
+              <h3>Is Lab 5 graded individually or by group?</h3>
+              <div class="tagrow"><span class="spacechip sc-indigo">CSE 4712</span><span class="tag">Matched: grading</span></div>
+              <div class="card__footer"><span class="pill pill--quiet">Sent to 6 people · 40m ago</span><span class="meta">Widens in 5h</span></div>
+            </div>
+          </div>
+
+          <button class="fab" data-goto="s-ask">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Ask something
+          </button>
+        </section>
+
+        <!-- ============ STUDENT : ASK ============ -->
+        <section class="screen" data-persona="student" data-screen="s-ask">
+          <div class="back-row"><span class="icon-btn" data-goto="s-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></span><h2>New request</h2></div>
+
+          <p class="field-label">What do you need help with?</p>
+          <textarea class="field" readonly>Does anyone have the CSE 4790 Week 6 slides?</textarea>
+
+          <div class="target-row">
+            <button class="target-btn" onclick="openSheet('ask')">
+              <span class="spacechip sc-flare" id="askSpaceChip">CSE 4790</span>
+              <span id="askSpaceName">Industrial Training</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </div>
+          <p class="target-hint">Asking into this hub. Only its members and its knowledge are used.</p>
+
+          <div class="chip-row">
+            <span class="chip chip--ai">Material request</span>
+            <span class="chip chip--ai">Batch 47 · Sec A</span>
+            <span class="chip chip--ai">tags: slides, week 6</span>
+          </div>
+
+          <p class="field-label">How soon do you need it?</p>
+          <div class="prio-row" id="prioRow">
+            <button data-prio="P3">Whenever</button>
+            <button class="active" data-prio="P2">Normal</button>
+            <button data-prio="P1">Today</button>
+            <button data-prio="P0" title="1 left this week">Blocking</button>
+          </div>
+          <p class="target-hint" style="margin:-6px 0 14px;" id="prioHint">Standard pace for this hub: 6h with peers, then the full batch.</p>
+
+          <button class="btn-primary" id="askSendBtn">Check for an answer</button>
+          <div id="askLoading" class="loading-row" style="display:none;"><span class="spinner"></span>Checking what CSE 4790 already knows…</div>
+
+          <div class="outcome" id="outcomeMatch">
+            <p class="kicker">Found in this hub's knowledge · 0.86 confidence</p>
+            <div class="answer-card">
+              <p>"The Week 6 slides were posted after Tuesday's lecture — pinned in Classroom under Week 6."</p>
+              <span class="source-line">Verified answer card · from a resolved request 3 days ago</span>
+            </div>
+            <button class="btn-primary" onclick="toast('Resolved. Nobody was notified.')">That's what I needed</button>
+            <button class="btn-secondary" onclick="showOutcome('nomatch')">Still need help</button>
+            <div style="text-align:center;"><button class="toggle-link" onclick="showOutcome('dupe')">See the duplicate outcome</button></div>
+          </div>
+
+          <div class="outcome" id="outcomeDupe">
+            <p class="kicker">3 people already asked this</p>
+            <div class="route-card">
+              <p><b>"Anyone have the Week 6 slides?"</b> — open, currently with the batch. Following means you get notified the moment it's answered, and no new request is created.</p>
+            </div>
+            <button class="btn-primary" data-goto="s-thread-a">Follow that one</button>
+            <button class="btn-secondary" onclick="showOutcome('nomatch')">Ask separately anyway</button>
+          </div>
+
+          <div class="outcome" id="outcomeNoMatch">
+            <p class="kicker">Nothing on file yet</p>
+            <div class="route-card">
+              <p>Sending to <b>8 people</b> in CSE 4790 — picked on who has answered slides/materials questions before, who's active, and who hasn't been pinged much this week.</p>
+              <p style="margin-bottom:0;">Quiet for <b>6h</b> → widens to all 38. Still quiet after <b>24h</b> → goes to your CR. Nothing reaches a teacher without a human approving it.</p>
+            </div>
+            <button class="btn-primary" onclick="toast('Sent — we\'ll keep it moving.')">Send request</button>
+            <div style="text-align:center;"><button class="toggle-link" onclick="showOutcome('match')">See the instant-answer outcome</button></div>
+          </div>
+        </section>
+
+        <!-- ============ STUDENT : THREAD A (horizontal) ============ -->
+        <section class="screen" data-persona="student" data-screen="s-thread-a">
+          <div class="back-row"><span class="icon-btn" data-goto="s-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></span><h2>Week 6 slides</h2></div>
+          <div class="tagrow" style="margin-bottom:12px;"><span class="spacechip sc-flare">CSE 4790</span><span class="tag">Materials</span><span class="tag">Normal</span></div>
+          <div class="stepper">
+            <div class="step done"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="lbl">Asked</span></div>
+            <div class="step done"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="lbl">8 peers</span></div>
+            <div class="step done"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="lbl">Full batch</span></div>
+            <div class="step current"><span class="dot"></span><span class="lbl">With CR</span></div>
+            <div class="step"><span class="dot"></span><span class="lbl">Resolved</span></div>
+          </div>
+          <p class="note-text">No answer from the 8 shortlisted peers in 6h, so it <b>widened horizontally</b> to all 38 members. Still quiet after 24h, so it moved to your CR.</p>
+          <p class="banner">3 others asked the same thing. Merged into one thread — everyone gets notified together.</p>
+          <div class="msg">
+            <span class="avatar avatar--ai">P</span>
+            <div class="msg__body">
+              <p class="who">PeerLoop <span>· automatic</span></p>
+              <p>Widened to CSE 4790 · Batch 47 (38 members) after 6h with no response.</p>
+              <p class="time">7h ago</p>
+            </div>
+          </div>
+          <div class="msg">
+            <span class="avatar">R</span>
+            <div class="msg__body">
+              <p class="who">Rifat <span>· Class rep</span></p>
+              <p>Checking with the course teacher, will share by tonight.</p>
+              <p class="time">12m ago</p>
+            </div>
+          </div>
+          <button class="btn-primary" disabled style="margin-top:auto;">Mark as resolved</button>
+          <p class="meta" style="text-align:center; margin-top:6px;">Enabled once someone answers</p>
+        </section>
+
+        <!-- ============ STUDENT : THREAD B (vertical) ============ -->
+        <section class="screen" data-persona="student" data-screen="s-thread-b">
+          <div class="back-row"><span class="icon-btn" data-goto="s-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></span><h2>Lab 3 extension</h2></div>
+          <div class="tagrow" style="margin-bottom:12px;"><span class="spacechip sc-indigo">CSE 4712</span><span class="tag">Needs authority</span><span class="tag">Today</span></div>
+          <div class="stepper">
+            <div class="step done"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="lbl">Asked</span></div>
+            <div class="step skipped"><span class="dot"></span><span class="lbl">Peers<br>skipped</span></div>
+            <div class="step current"><span class="dot"></span><span class="lbl">With CR</span></div>
+            <div class="step"><span class="dot"></span><span class="lbl">Instructor<br>(approval)</span></div>
+            <div class="step"><span class="dot"></span><span class="lbl">Resolved</span></div>
+          </div>
+          <p class="note-text">This needs <b>approval, not knowledge</b>, so it skipped the peer stages entirely and went straight to your CR — vertical escalation. Because you marked it <b>Today</b>, the CR window is 6h instead of 12h.</p>
+          <div class="msg">
+            <span class="avatar">R</span>
+            <div class="msg__body">
+              <p class="who">Rifat <span>· Class rep</span></p>
+              <p>Reviewing with the coordinator, will confirm by tomorrow morning.</p>
+              <p class="time">40m ago</p>
+            </div>
+          </div>
+          <p class="note-text" style="margin-top:auto;">If the CR doesn't act, PeerLoop will <b>ask the CR to approve</b> sending this to Dr. Kamal. It won't do that on its own.</p>
+          <button class="btn-primary" disabled>Mark as resolved</button>
+        </section>
+
+        <!-- ============ STUDENT : HUB ============ -->
+        <section class="screen" data-persona="student" data-screen="s-hub">
+          <div class="topline"><h2>Hub</h2>
+            <div class="icon-btn" onclick="toast('Notification settings for this hub.')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.7a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.7h4l.4-2.7a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5A7 7 0 0 0 19 12Z"/></svg></div>
+          </div>
+
+          <button class="hubswitch" onclick="openSheet('hub')">
+            <div>
+              <p class="hs-code" id="hubCode">CSE 4790 · Industrial Training</p>
+              <p class="hs-sub" id="hubSub">Batch 47 · Sec A · 38 members · you're a student</p>
+            </div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></svg>
+          </button>
+
+          <div class="search-field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+            <input placeholder="Search this hub" readonly>
+          </div>
+
+          <div class="section-head">
+            <p class="section-label">PINNED BY YOUR CR</p>
+            <button class="link-btn" data-goto="s-pinned">All 12 ›</button>
+          </div>
+          <div class="ref-row" onclick="toast('Opens in Classroom — PeerLoop never stores the file.')"><div><p class="t">ITR submission notice</p><p class="c">Links to Classroom · pinned by Rifat</p></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4L10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h5"/></svg></div>
+          <div class="ref-row" onclick="toast('Opens in Classroom — PeerLoop never stores the file.')"><div><p class="t">Week 6 slides</p><p class="c">Links to Classroom · pinned by Rifat</p></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4L10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h5"/></svg></div>
+          <div class="ref-row" onclick="toast('Opens in Classroom — PeerLoop never stores the file.')"><div><p class="t">Lab 3 brief + rubric</p><p class="c">Links to Drive · pinned by Dr. Nasrin</p></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4L10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h5"/></svg></div>
+          <div class="ref-row" onclick="toast('Opens in Classroom — PeerLoop never stores the file.')"><div><p class="t">Mid-term syllabus</p><p class="c">Links to Classroom · pinned by Rifat</p></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4L10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h5"/></svg></div>
+          <p class="meta" style="margin:8px 0 0;">Only the first 4 show here — the CR controls the order.</p>
+
+          <div class="section-head" style="margin-top:20px;">
+            <p class="section-label">ALREADY ANSWERED</p>
+            <button class="link-btn" data-goto="s-answered">All 9 ›</button>
+          </div>
+          <div class="ref-row" data-goto="s-card"><div><p class="t"><span class="dot-mark dot-verified"></span>How is the final grade weighted?</p><p class="c">Verified by Dr. Nasrin · asked 4 times</p></div></div>
+          <div class="ref-row" data-goto="s-card"><div><p class="t"><span class="dot-mark dot-verified"></span>Where do we submit the proposal PDF?</p><p class="c">Verified by Rifat · asked 6 times</p></div></div>
+          <div class="ref-row" data-goto="s-card"><div><p class="t"><span class="dot-mark dot-unverified"></span>What font size for the ITR report?</p><p class="c">From a resolved request · not verified yet</p></div></div>
+          <p class="meta" style="margin:8px 0 0;">New answers land here automatically when a request is resolved.</p>
+        </section>
+
+        <!-- ============ STUDENT : PINNED (expanded) ============ -->
+        <section class="screen" data-persona="student" data-screen="s-pinned">
+          <div class="back-row"><span class="icon-btn" data-goto="s-hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></span><h2>Pinned references</h2></div>
+          <p class="note-text">12 links for CSE 4790, added by your CR and instructor. <b>PeerLoop stores the link, never the file</b> — everything opens in Classroom or Drive.</p>
+          <p class="section-label">SUBMISSIONS</p>
+          <div class="ref-row"><div><p class="t">ITR submission notice</p><p class="c">Classroom · 12 Sep</p></div></div>
+          <div class="ref-row"><div><p class="t">Proposal upload form</p><p class="c">Google Form · 2 Sep</p></div></div>
+          <div class="ref-row"><div><p class="t">Report template (.docx)</p><p class="c">Drive · 2 Sep</p></div></div>
+          <p class="section-label" style="margin-top:16px;">LECTURES</p>
+          <div class="ref-row"><div><p class="t">Week 6 slides</p><p class="c">Classroom · 16 Sep</p></div></div>
+          <div class="ref-row"><div><p class="t">Week 5 slides</p><p class="c">Classroom · 9 Sep</p></div></div>
+          <div class="ref-row"><div><p class="t">Week 4 slides + notes</p><p class="c">Classroom · 2 Sep</p></div></div>
+          <div class="ref-row"><div><p class="t">Recorded session — agentic AI</p><p class="c">Drive · 16 Sep</p></div></div>
+          <p class="section-label" style="margin-top:16px;">LABS &amp; ASSESSMENT</p>
+          <div class="ref-row"><div><p class="t">Lab 3 brief + rubric</p><p class="c">Drive · 14 Sep</p></div></div>
+          <div class="ref-row"><div><p class="t">Mid-term syllabus</p><p class="c">Classroom · 10 Sep</p></div></div>
+          <div class="ref-row"><div><p class="t">Grading policy</p><p class="c">Classroom · 1 Sep</p></div></div>
+          <div class="ref-row"><div><p class="t">Lab group allocation</p><p class="c">Sheet · 28 Aug</p></div></div>
+          <div class="ref-row"><div><p class="t">Course outline</p><p class="c">Classroom · 25 Aug</p></div></div>
+        </section>
+
+        <!-- ============ STUDENT : ANSWERED (expanded) ============ -->
+        <section class="screen" data-persona="student" data-screen="s-answered">
+          <div class="back-row"><span class="icon-btn" data-goto="s-hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></span><h2>Already answered</h2></div>
+          <div class="seg" data-segset="ans">
+            <button class="active" data-seg="all">All 9</button>
+            <button data-seg="v">Verified 7</button>
+            <button data-seg="w">This week 3</button>
+          </div>
+          <p class="note-text">Every resolved request becomes a card here automatically. A <span class="dot-mark dot-verified" style="display:inline-block;"></span> means a CR or teacher checked it.</p>
+          <div class="ref-row" data-goto="s-card"><div><p class="t"><span class="dot-mark dot-verified"></span>How is the final grade weighted?</p><p class="c">Verified · asked 4 times · 2 days ago</p></div></div>
+          <div class="ref-row" data-goto="s-card"><div><p class="t"><span class="dot-mark dot-verified"></span>Where do we submit the proposal PDF?</p><p class="c">Verified · asked 6 times · 5 days ago</p></div></div>
+          <div class="ref-row" data-goto="s-card"><div><p class="t"><span class="dot-mark dot-verified"></span>Is attendance counted in the final grade?</p><p class="c">Verified · asked 3 times · 6 days ago</p></div></div>
+          <div class="ref-row" data-goto="s-card"><div><p class="t"><span class="dot-mark dot-unverified"></span>What font size for the ITR report?</p><p class="c">Not verified yet · 1 day ago</p></div></div>
+          <div class="ref-row" data-goto="s-card"><div><p class="t"><span class="dot-mark dot-unverified"></span>Can we use Overleaf for the report?</p><p class="c">Not verified yet · 3 days ago</p></div></div>
+          <div class="ref-row" data-goto="s-card"><div><p class="t"><span class="dot-mark dot-verified"></span>Which lab section is Batch 47 Sec A in?</p><p class="c">Verified · 1 week ago</p></div></div>
+          <div class="ref-row" data-goto="s-card"><div><p class="t"><span class="dot-mark dot-verified"></span>Is the Week 4 quiz open book?</p><p class="c">Verified · 2 weeks ago</p></div></div>
+        </section>
+
+        <!-- ============ STUDENT : ANSWER CARD ============ -->
+        <section class="screen" data-persona="student" data-screen="s-card">
+          <div class="back-row"><span class="icon-btn" data-goto="s-hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></span><h2>Answer</h2></div>
+          <div class="tagrow" style="margin-bottom:12px;"><span class="spacechip sc-flare">CSE 4790</span><span class="tag">Academic help</span><span class="pill pill--resolved">Verified</span></div>
+          <h3 style="font-family:var(--font-display); font-weight:500; font-size:18px; margin:0 0 10px; line-height:1.3;">How is the final grade weighted?</h3>
+          <div class="answer-card">
+            <p>40% final exam, 25% mid-term, 20% lab work, 15% the industrial training report. The report mark is submitted by the supervisor, not the course teacher.</p>
+            <span class="source-line">Verified by Dr. Nasrin · 18 Sep</span>
+          </div>
+          <p class="note-text" style="margin-top:12px;">Created automatically when <b>Tahmid's</b> request was resolved 2 days ago. Contributors: Tahmid, Rifat. Retrieved 4 times since.</p>
+          <button class="btn-secondary" data-goto="s-thread-a">Open the source thread</button>
+          <button class="btn-secondary" data-goto="s-ask">This doesn't answer it — ask anyway</button>
+          <p class="meta" style="text-align:center; margin-top:10px;">Telling us it's wrong flags it for your CR.</p>
+        </section>
+
+        <!-- ============ STUDENT : PROFILE ============ -->
+        <section class="screen" data-persona="student" data-screen="s-profile">
+          <div class="topline"><h2>You</h2></div>
+          <div class="avatar-lg">AR</div>
+          <p class="profile-name">Arisha Rahman</p>
+          <p class="profile-sub">CSE · Batch 47 · 2 hubs</p>
+          <div class="stat-row">
+            <div class="stat"><span class="n">9</span><span class="l">Helped<br>others</span></div>
+            <div class="stat"><span class="n">14</span><span class="l">Requests<br>closed</span></div>
+            <div class="stat"><span class="n">3h</span><span class="l">Median wait<br>for you</span></div>
+          </div>
+          <div class="badge-card">
+            <p class="name">Verified helper · CSE 4790</p>
+            <p>Earned after 5 accepted answers. Only you and your CR see this — there's no public leaderboard by default.</p>
+          </div>
+          <p class="section-label" style="margin-top:6px;">YOUR HUBS</p>
+          <div class="ref-row" onclick="openSheet('hub')"><div><p class="t"><span class="spacechip sc-flare">CSE 4790</span></p><p class="c">Industrial Training · student · Verified helper</p></div></div>
+          <div class="ref-row" onclick="openSheet('hub')"><div><p class="t"><span class="spacechip sc-indigo">CSE 4712</span></p><p class="c">Software Engineering · student</p></div></div>
+          <p class="section-label" style="margin:18px 0 4px;">CONTROLS</p>
+          <div class="toggle-row"><p>Show my stats on the opt-in leaderboard</p><div class="switch" onclick="this.classList.toggle('on')"></div></div>
+          <div class="toggle-row"><p>Only notify me for tags I've answered before</p><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="toggle-row"><p>Quiet hours · 11pm – 7am</p><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+        </section>
+
+        <!-- ============ CR : QUEUE ============ -->
+        <section class="screen" data-persona="cr" data-screen="c-queue">
+          <div class="topline"><h2>Queue</h2>
+            <div class="icon-row"><button class="hub-pill" onclick="openSheet('hub')"><span class="spacechip sc-flare js-hub-chip">CSE 4790</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="icon-btn" onclick="toast('Weekly digest email settings.')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg></div></div>
+          </div>
+          <div class="stat-strip"><b class="js-hub-sub">Class rep · Batch 47 Sec A · 38 members</b><br>Median first response this week: <b>5h</b> (was 9h) · <b>71%</b> resolved before reaching you · <b>2</b> unresolved.</div>
+
+          <p class="section-label">NEEDS YOUR APPROVAL · 2</p>
+          <div class="queue-card">
+            <h3>Send "Lab 3 extension" to Dr. Kamal?</h3>
+            <p class="why">Vertical request · 12h with you, no decision · marked Today by the requester.</p>
+            <p class="agent-quote">PeerLoop drafted: "4 students have requested a 48h extension on Lab 3, citing the mid-term on the 24th. No peer can grant this."</p>
+            <div class="btn-row">
+              <button class="btn-approve" onclick="toast('Sent to Dr. Kamal with your note.')">Approve</button>
+              <button onclick="toast('Draft opened for editing.')">Edit</button>
+              <button onclick="toast('Declined — requester notified with your reason.')">Decline</button>
+            </div>
+          </div>
+          <div class="queue-card">
+            <h3>Publish answer card: "What font size for the ITR report?"</h3>
+            <p class="why">Generated from a resolved request · flagged because it quotes a teacher's message.</p>
+            <div class="btn-row">
+              <button class="btn-approve" onclick="toast('Published and verified.')">Publish</button>
+              <button onclick="toast('Card opened for editing.')">Edit</button>
+              <button onclick="toast('Discarded.')">Discard</button>
+            </div>
+          </div>
+
+          <p class="section-label" style="margin-top:18px;">ESCALATED TO YOU · 3</p>
+          <div class="queue-card">
+            <h3>Anyone have the Week 6 slides?</h3>
+            <div class="tagrow"><span class="pill pill--flare">With you 2h</span><span class="tag">4 following</span><span class="tag">Materials</span></div>
+            <p class="why">8 peers → full batch → you. Nobody answered in 30h.</p>
+            <div class="btn-row">
+              <button class="btn-approve" onclick="toast('Answered — 4 requesters notified.')">Answer</button>
+              <button onclick="toast('Pinned. It will be found automatically next time.')">Pin a link</button>
+              <button onclick="toast('Reassigned to Tahmid.')">Reassign</button>
+            </div>
+          </div>
+          <div class="queue-card">
+            <h3>Projector not working in Lab 3</h3>
+            <div class="tagrow"><span class="pill pill--flare">Blocking</span><span class="tag">Campus issue</span></div>
+            <p class="why">Skipped peers — this needs someone with access, not knowledge.</p>
+            <div class="btn-row">
+              <button class="btn-approve" onclick="toast('Marked as handled.')">Handle</button>
+              <button onclick="toast('Escalated to the department.')">Escalate now</button>
+              <button onclick="toast('Paused — reason recorded on the thread.')">Hold</button>
+            </div>
+          </div>
+
+          <p class="section-label" style="margin-top:18px;">STALLING · WIDENS SOON · 2</p>
+          <div class="queue-card">
+            <h3>What's the file format for the ITR report?</h3>
+            <div class="tagrow"><span class="pill pill--quiet">Widens to 38 people in 4h</span></div>
+            <p class="why">Catching this now stops 38 notifications going out.</p>
+            <div class="btn-row">
+              <button class="btn-approve" onclick="toast('Answered before it widened.')">Answer now</button>
+              <button onclick="toast('Clock paused.')">Hold</button>
+            </div>
+          </div>
+          <div class="queue-card">
+            <h3>Is Lab 5 graded individually or by group?</h3>
+            <div class="tagrow"><span class="pill pill--quiet">Widens in 5h</span></div>
+            <div class="btn-row">
+              <button class="btn-approve" onclick="toast('Answered before it widened.')">Answer now</button>
+              <button onclick="toast('Clock paused.')">Hold</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ CR : REQUESTS ============ -->
+        <section class="screen" data-persona="cr" data-screen="c-requests">
+          <div class="topline"><h2>All requests</h2><button class="hub-pill" onclick="openSheet('hub')"><span class="spacechip sc-flare js-hub-chip">CSE 4790</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button></div>
+          <div class="seg" data-segset="creq">
+            <button class="active" data-seg="open">Open 7</button>
+            <button data-seg="esc">Escalated 3</button>
+            <button data-seg="unres">Unresolved 2</button>
+          </div>
+          <div class="search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input placeholder="Filter by topic, tag or person" readonly></div>
+          <div class="card"><h3>Anyone have the Week 6 slides?</h3><div class="tagrow"><span class="tag">T4 · with you</span><span class="tag">4 merged</span></div><div class="card__footer"><span class="pill pill--flare">30h open</span><span class="meta">Arisha +3</span></div></div>
+          <div class="card"><h3>What's the file format for the ITR report?</h3><div class="tagrow"><span class="tag">T1 · 8 peers</span></div><div class="card__footer"><span class="pill pill--quiet">2h open</span><span class="meta">Nabila</span></div></div>
+          <div class="card"><h3>Projector not working in Lab 3</h3><div class="tagrow"><span class="tag">T4 · with you</span><span class="tag">P0</span></div><div class="card__footer"><span class="pill pill--flare">40m open</span><span class="meta">Sifat</span></div></div>
+          <div class="card"><h3>Can someone explain the routing example from Week 5?</h3><div class="tagrow"><span class="tag">T2 · full batch</span></div><div class="card__footer"><span class="pill pill--quiet">9h open</span><span class="meta">Rafi</span></div></div>
+          <p class="note-text" style="margin-top:6px;">Select several to <b>merge</b> duplicates, or use <b>Move to…</b> on anything filed in the wrong hub.</p>
+        </section>
+
+        <!-- ============ CR : KNOWLEDGE ============ -->
+        <section class="screen" data-persona="cr" data-screen="c-knowledge">
+          <div class="topline"><h2>Knowledge</h2><button class="hub-pill" onclick="openSheet('hub')"><span class="spacechip sc-flare js-hub-chip">CSE 4790</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button></div>
+          <div class="seg" data-segset="cknow">
+            <button class="active" data-seg="review">To review 2</button>
+            <button data-seg="pins">Pins 12</button>
+            <button data-seg="stale">Stale 3</button>
+          </div>
+          <button class="fab" onclick="showScreen('c-newknow')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Add knowledge
+          </button>
+
+          <div data-segpanel="review">
+            <p class="note-text">Cards PeerLoop generated from resolved requests. They're already visible to students with an <span class="dot-mark dot-unverified" style="display:inline-block;"></span> mark — verifying removes the mark and makes the AI trust them more.</p>
+            <div class="queue-card">
+              <h3>What font size for the ITR report?</h3>
+              <p class="agent-quote">"12pt, Times New Roman, 1.5 line spacing — per the report template pinned in Classroom."</p>
+              <p class="why">From Nabila's request, resolved 1 day ago · source: pinned template</p>
+              <div class="btn-row"><button class="btn-approve" onclick="toast('Verified.')">Verify</button><button onclick="toast('Editing.')">Edit</button><button onclick="toast('Merged into the report-format card.')">Merge</button><button onclick="toast('Discarded.')">Discard</button></div>
+            </div>
+            <div class="queue-card">
+              <h3>Can we use Overleaf for the report?</h3>
+              <p class="agent-quote">"Yes — submit the exported PDF. The .docx template is only a formatting reference."</p>
+              <p class="why">From Rafi's request, resolved 3 days ago · answered by a peer, unconfirmed</p>
+              <div class="btn-row"><button class="btn-approve" onclick="toast('Verified.')">Verify</button><button onclick="toast('Asked Dr. Nasrin to confirm.')">Ask teacher</button><button onclick="toast('Discarded.')">Discard</button></div>
+            </div>
+          </div>
+
+          <div data-segpanel="pins" style="display:none;">
+            <p class="note-text">Drag to reorder. Students see the <b>top 4</b> on their hub; the rest live behind "All 12".</p>
+            <div class="ref-row"><div><p class="t">ITR submission notice</p><p class="c">Classroom · 42 opens</p></div><span class="meta">⠿</span></div>
+            <div class="ref-row"><div><p class="t">Week 6 slides</p><p class="c">Classroom · 31 opens</p></div><span class="meta">⠿</span></div>
+            <div class="ref-row"><div><p class="t">Lab 3 brief + rubric</p><p class="c">Drive · 28 opens</p></div><span class="meta">⠿</span></div>
+            <div class="ref-row"><div><p class="t">Mid-term syllabus</p><p class="c">Classroom · 22 opens</p></div><span class="meta">⠿</span></div>
+            <div class="divider-note">STUDENTS SEE UP TO HERE</div>
+            <div class="ref-row"><div><p class="t">Grading policy</p><p class="c">Classroom · 19 opens</p></div><span class="meta">⠿</span></div>
+            <div class="ref-row"><div><p class="t">Report template (.docx)</p><p class="c">Drive · 17 opens</p></div><span class="meta">⠿</span></div>
+            <button class="btn-secondary" onclick="showScreen('c-newknow'); knowMode('link');" style="margin-top:6px;">+ Pin another link</button>
+          </div>
+
+          <div data-segpanel="stale" style="display:none;">
+            <p class="note-text">Deadline and materials answers expire after 21 days. Stale cards still appear, but PeerLoop won't resolve a request with them on its own.</p>
+            <div class="queue-card"><h3>When is the proposal due?</h3><p class="why">Expired 4 days ago · retrieved twice since</p><div class="btn-row"><button class="btn-approve" onclick="toast('Refreshed for another 21 days.')">Still correct</button><button onclick="toast('Editing.')">Update</button><button onclick="toast('Retired.')">Retire</button></div></div>
+            <div class="queue-card"><h3>Which room is the make-up class in?</h3><p class="why">Expired 11 days ago</p><div class="btn-row"><button class="btn-approve" onclick="toast('Refreshed.')">Still correct</button><button onclick="toast('Retired.')">Retire</button></div></div>
+          </div>
+        </section>
+
+        <!-- ============ CR : ADD KNOWLEDGE ============ -->
+        <section class="screen" data-persona="cr" data-screen="c-newknow">
+          <div class="back-row"><span class="icon-btn" onclick="showScreen('c-knowledge')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></span><h2>Add to CSE 4790 knowledge</h2></div>
+          <p class="note-text">Nobody has to ask first. Anything you add here is what PeerLoop answers with — and answering from it notifies no one at all.</p>
+          <div class="seg" id="knowModeSeg">
+            <button class="active" onclick="knowMode('card')">Write an answer</button>
+            <button onclick="knowMode('link')">Pin a link</button>
+          </div>
+
+          <div id="knowCard">
+            <p class="field-label">The question students would ask</p>
+            <textarea class="field" style="min-height:46px;" readonly>Where is the mid-term seating plan?</textarea>
+            <div class="dupe-warn">
+              <b>Nothing like this exists yet.</b> If it did, you'd be editing that card instead of creating a second one.
+            </div>
+            <p class="field-label" style="margin-top:14px;">Your answer</p>
+            <textarea class="field" readonly>Seating plans go up on the notice board outside Room 302 two days before each exam, and Rifat mirrors them in the hub. They are not posted in Classroom.</textarea>
+            <p class="field-label" style="margin-top:14px;">Category</p>
+            <div class="chip-row">
+              <span class="chip chip--on">Information</span>
+              <span class="chip">Material</span>
+              <span class="chip">Academic help</span>
+              <span class="chip">Coordination</span>
+            </div>
+            <div class="toggle-row"><p>Expires in 21 days<br><span class="meta">Information about a fixed date goes stale. Conceptual answers last the term.</span></p><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+            <div class="toggle-row"><p>Notify the hub now<br><span class="meta">Off by default — this just sits in knowledge until someone asks.</span></p><div class="switch" onclick="this.classList.toggle('on')"></div></div>
+            <button class="btn-primary" style="margin-top:14px;" onclick="toast('Published as verified. 38 students can find it; none were notified.')">Publish as verified</button>
+            <p class="meta" style="text-align:center; margin-top:6px;">Published by you, so it carries your name and skips the review queue.</p>
+          </div>
+
+          <div id="knowLink" style="display:none;">
+            <p class="field-label">Link</p>
+            <input class="input-line" placeholder="Paste a Classroom or Drive link" readonly>
+            <p class="field-label" style="margin-top:14px;">What is it called?</p>
+            <input class="input-line" placeholder="e.g. Lab 4 brief + rubric" readonly>
+            <p class="field-label" style="margin-top:14px;">Category</p>
+            <div class="chip-row">
+              <span class="chip chip--on">Material</span>
+              <span class="chip">Information</span>
+              <span class="chip">Coordination</span>
+            </div>
+            <p class="note-text">PeerLoop stores the link, never the file. Official material stays in Classroom — if the link moves, update it here.</p>
+            <div class="toggle-row"><p>Show in the top 4 on the student hub<br><span class="meta">Pushes the current fourth item behind "All 13".</span></p><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+            <button class="btn-primary" style="margin-top:14px;" onclick="toast('Pinned for CSE 4790.')">Pin reference</button>
+          </div>
+        </section>
+
+        <!-- ============ CR : SPACE / PACE ============ -->
+        <section class="screen" data-persona="cr" data-screen="c-space">
+          <div class="topline"><h2>Hub settings</h2><button class="hub-pill" onclick="openSheet('hub')"><span class="spacechip sc-flare js-hub-chip">CSE 4790</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button></div>
+          <p class="section-label">RESPONSE PACE</p>
+          <p class="note-text">How long a request waits at each stage before moving on. Urgency shortens these automatically — <b>Today</b> halves them, <b>Blocking</b> cuts them to a sixth.</p>
+          <div class="preset-row" id="presetRow">
+            <button data-preset="relaxed">Relaxed</button>
+            <button class="active" data-preset="standard">Standard</button>
+            <button data-preset="fast">Fast</button>
+          </div>
+          <p class="target-hint" id="paceSummary" style="margin:-4px 0 14px;">8 peers for 6h → all 38 for 24h → you for 24h → approval needed for the teacher.</p>
+
+          <p class="section-label">ADVANCED · QUESTIONS ANYONE CAN ANSWER</p>
+          <div class="dwell-row"><div><p class="dl">Shortlisted peers</p><p class="ds">8 people picked by topic and responsiveness</p></div><div class="dwell-input"><input type="number" id="dwT1" value="6" min="1" max="72"><span>h</span></div></div>
+          <div class="dwell-row"><div><p class="dl">Full batch</p><p class="ds">All 38 members, as one digest</p></div><div class="dwell-input"><input type="number" id="dwT2" value="24" min="1" max="72"><span>h</span></div></div>
+          <div class="dwell-row"><div><p class="dl">You, the class rep</p><p class="ds">Individual push, always</p></div><div class="dwell-input"><input type="number" id="dwT4" value="24" min="1" max="72"><span>h</span></div></div>
+          <div class="dwell-row"><div><p class="dl">Course teacher</p><p class="ds">Approval-gated — never automatic</p></div><div class="dwell-input"><span class="meta">you approve</span></div></div>
+
+          <p class="section-label" style="margin-top:18px;">ADVANCED · REQUESTS THAT NEED AUTHORITY</p>
+          <div class="dwell-row"><div><p class="dl">Straight to you</p><p class="ds">Peer stages are skipped entirely</p></div><div class="dwell-input"><input type="number" id="dwA4" value="12" min="1" max="72"><span>h</span></div></div>
+          <div class="dwell-row"><div><p class="dl">Then the teacher</p><p class="ds">PeerLoop asks you to approve first</p></div><div class="dwell-input"><span class="meta">you approve</span></div></div>
+
+          <p class="section-label" style="margin-top:18px;">QUIET HOURS</p>
+          <div class="toggle-row"><p>Pause the clock 11pm – 7am (except Blocking)</p><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="toggle-row"><p>Pause 45 min whenever someone replies</p><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+          <p class="note-text" style="margin-top:12px;">Changes apply to <b>new requests only</b>. Anything already in flight keeps the timings it started with.</p>
+
+          <p class="section-label" style="margin-top:14px;">MEMBERS &amp; ACCESS</p>
+          <div class="ref-row" onclick="toast('38 members · 1 co-rep · 1 instructor')"><div><p class="t">38 members</p><p class="c">1 co-rep · Dr. Nasrin (instructor)</p></div></div>
+          <div class="ref-row" onclick="toast('Join code rotated: 4790-M2XP')"><div><p class="t">Join code · 4790-A7KQ</p><p class="c">Tap to rotate · expires at term end</p></div></div>
+          <div class="ref-row" onclick="toast('CSV roster import.')"><div><p class="t">Import roster</p><p class="c">CSV: student ID, name, email, section</p></div></div>
+        </section>
+
+        <!-- ============ INSTRUCTOR : OVERVIEW ============ -->
+        <section class="screen" data-persona="instructor" data-screen="i-overview">
+          <div class="topline"><h2>Your courses</h2>
+            <div class="icon-btn" onclick="toast('Weekly digest, Sunday 8am.')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v12H4z"/><path d="M4 7l8 6 8-6"/></svg></div>
+          </div>
+          <p class="note-text">You're not meant to live here. PeerLoop only pulls you in when a class rep has approved sending something up, or when the same question keeps coming back.</p>
+          <div class="kpi-grid">
+            <div class="kpi"><span class="n">2</span><span class="l">Waiting on you</span><span class="d d-down">1 is urgent</span></div>
+            <div class="kpi"><span class="n">74%</span><span class="l">Resolved without you or the CR</span><span class="d d-up">+11 pts</span></div>
+            <div class="kpi"><span class="n">5h</span><span class="l">Median first response</span><span class="d d-up">was 9h</span></div>
+            <div class="kpi"><span class="n">3</span><span class="l">Recurring topics</span><span class="d d-down">1 new</span></div>
+          </div>
+          <p class="section-label">COURSES</p>
+          <div class="list-row" data-goto="i-insights">
+            <div><p class="lt">CSE 4790 · Industrial Training</p><p class="lc">38 students · CR Rifat · 7 open · 2 unresolved</p></div>
+            <span class="health h-green"></span>
+          </div>
+          <div class="list-row" data-goto="i-insights">
+            <div><p class="lt">CSE 4712 · Software Engineering</p><p class="lc">41 students · CR Rifat · 11 open · 5 unresolved</p></div>
+            <span class="health h-amber"></span>
+          </div>
+          <p class="meta" style="margin-top:10px;">Amber means the unresolved rate is above 10% — worth a look, not an emergency.</p>
+        </section>
+
+        <!-- ============ INSTRUCTOR : NEEDS ME ============ -->
+        <section class="screen" data-persona="instructor" data-screen="i-needsme">
+          <div class="topline"><h2>Needs you · 2</h2></div>
+          <p class="note-text">Every item here was <b>approved by a class rep</b> before it reached you. PeerLoop never escalates to a teacher on its own.</p>
+          <div class="queue-card">
+            <h3>Lab 3 extension request</h3>
+            <div class="tagrow"><span class="spacechip sc-indigo">CSE 4712</span><span class="pill pill--flare">Approved by Rifat · 20m ago</span></div>
+            <p class="agent-quote">"4 students requested a 48h extension on Lab 3, citing the mid-term on the 24th. No peer can grant this."</p>
+            <p class="why">Trail: asked 14h ago → straight to CR (needs authority) → CR approved sending to you.</p>
+            <div class="btn-row">
+              <button class="btn-approve" onclick="toast('Answered — and published as a verified card.')">Answer &amp; publish</button>
+              <button onclick="toast('Sent back to Rifat to handle.')">Back to CR</button>
+              <button onclick="toast('Declined with your note.')">Decline</button>
+            </div>
+          </div>
+          <div class="queue-card">
+            <h3>Projector not working in Lab 3</h3>
+            <div class="tagrow"><span class="spacechip sc-flare">CSE 4790</span><span class="pill pill--flare">Blocking · class in 2h</span></div>
+            <p class="why">Trail: reported 40m ago → CR tried facilities → escalated to you.</p>
+            <div class="btn-row">
+              <button class="btn-approve" onclick="toast('Forwarded to the department.')">Send to department</button>
+              <button onclick="toast('Room change announced to the class.')">Announce a room change</button>
+            </div>
+          </div>
+          <p class="note-text" style="margin-top:6px;"><b>Answer &amp; publish</b> writes your reply straight into the hub as a verified card, so the next student gets it instantly without asking you.</p>
+        </section>
+
+        <!-- ============ INSTRUCTOR : INSIGHTS ============ -->
+        <section class="screen" data-persona="instructor" data-screen="i-insights">
+          <div class="topline"><h2>Insights</h2><button class="hub-pill" onclick="openSheet('hub')"><span class="spacechip sc-flare js-hub-chip">CSE 4790</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button></div>
+          <p class="meta js-hub-sub" style="margin:-6px 0 14px;">Week 6 of 12 · 38 students</p>
+
+          <p class="section-label">RECURRING QUESTIONS · NO VERIFIED ANSWER</p>
+          <div class="queue-card">
+            <h3>Where exactly do we submit the ITR report?</h3>
+            <p class="why">Asked 6 times in 9 days by 6 different students · 2 reached the CR</p>
+            <div class="btn-row"><button class="btn-approve" onclick="toast('Published as a verified answer.')">Publish an answer</button><button onclick="toast('Pinned the submission notice.')">Pin a link</button><button onclick="toast('Marked as covered in class.')">Covered in class</button></div>
+          </div>
+          <div class="queue-card">
+            <h3>How does the supervisor's mark feed into the grade?</h3>
+            <p class="why">Asked 4 times in 6 days · peers gave 3 different answers</p>
+            <div class="btn-row"><button class="btn-approve" onclick="toast('Published as a verified answer.')">Publish an answer</button><button onclick="toast('Marked as covered in class.')">Covered in class</button></div>
+          </div>
+
+          <p class="section-label" style="margin-top:18px;">WHERE REQUESTS ARE BEING RESOLVED</p>
+          <div class="bar-row"><span class="bl">Answered instantly from the hub</span><span class="bar-track"><span class="bar-fill" style="width:26%"></span></span><span class="bv">26%</span></div>
+          <div class="bar-row"><span class="bl">By shortlisted peers</span><span class="bar-track"><span class="bar-fill" style="width:38%"></span></span><span class="bv">38%</span></div>
+          <div class="bar-row"><span class="bl">After widening to the batch</span><span class="bar-track"><span class="bar-fill" style="width:16%"></span></span><span class="bv">16%</span></div>
+          <div class="bar-row"><span class="bl">By the class rep</span><span class="bar-track"><span class="bar-fill alt" style="width:12%"></span></span><span class="bv">12%</span></div>
+          <div class="bar-row"><span class="bl">By you</span><span class="bar-track"><span class="bar-fill alt" style="width:5%"></span></span><span class="bv">5%</span></div>
+          <div class="bar-row"><span class="bl">Never resolved</span><span class="bar-track"><span class="bar-fill" style="width:3%"></span></span><span class="bv">3%</span></div>
+          <p class="meta" style="margin-top:8px;">The top two bars are the product working. The bottom bar is the one to watch.</p>
+
+          <p class="section-label" style="margin-top:18px;">TOPICS BY WEEK</p>
+          <div class="bar-row"><span class="bl">Submission &amp; format</span><span class="bar-track"><span class="bar-fill" style="width:72%"></span></span><span class="bv">18</span></div>
+          <div class="bar-row"><span class="bl">Lab logistics</span><span class="bar-track"><span class="bar-fill" style="width:48%"></span></span><span class="bv">12</span></div>
+          <div class="bar-row"><span class="bl">Grading</span><span class="bar-track"><span class="bar-fill" style="width:36%"></span></span><span class="bv">9</span></div>
+          <div class="bar-row"><span class="bl">Week 5 concepts</span><span class="bar-track"><span class="bar-fill" style="width:24%"></span></span><span class="bv">6</span></div>
+        </section>
+
+        <!-- ============ INSTRUCTOR : COURSE ============ -->
+        <section class="screen" data-persona="instructor" data-screen="i-course">
+          <div class="topline"><h2>Course settings</h2><button class="hub-pill" onclick="openSheet('hub')"><span class="spacechip sc-flare js-hub-chip">CSE 4790</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button></div>
+          <p class="section-label">ESCALATION POLICY</p>
+          <p class="note-text">Set the ceiling for what your class rep can change. Locking freezes the pace for everyone.</p>
+          <div class="preset-row">
+            <button onclick="setActive(this)">Relaxed</button>
+            <button class="active" onclick="setActive(this)">Standard</button>
+            <button onclick="setActive(this)">Fast</button>
+          </div>
+          <div class="toggle-row"><p>Lock the pace — the CR can't change it</p><div class="switch" onclick="this.classList.toggle('on'); toast(this.classList.contains('on') ? 'Locked. Rifat now sees it read-only.' : 'Unlocked.')"></div></div>
+          <div class="toggle-row"><p>Let the CR escalate to me without approval</p><div class="switch" onclick="this.classList.toggle('on')"></div></div>
+          <div class="toggle-row"><p>Auto-verify answers I write</p><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+
+          <p class="section-label" style="margin-top:18px;">PEOPLE</p>
+          <div class="ref-row" onclick="toast('Rifat Hossain · 220041xxx')"><div><p class="t">Class rep · Rifat Hossain</p><p class="c">Tap to reassign</p></div></div>
+          <div class="ref-row" onclick="toast('Add a co-rep to share the queue.')"><div><p class="t">Add a co-rep</p><p class="c">Splits the approval queue</p></div></div>
+          <div class="ref-row" onclick="toast('38 students enrolled.')"><div><p class="t">Roster · 38 students</p><p class="c">Imported 1 Sep · re-import to update</p></div></div>
+
+          <p class="section-label" style="margin-top:18px;">ANNOUNCE</p>
+          <div class="pin-panel">
+            <p class="field-label">Announcement</p>
+            <input placeholder="Goes out as a pinned reference + one notification" readonly>
+            <p class="hint">Announcements are pinned to the hub so they're searchable later — not just pushed and lost.</p>
+            <button onclick="toast('Announced and pinned to CSE 4790.')">Send</button>
+          </div>
+
+          <p class="section-label" style="margin-top:18px;">AGENT</p>
+          <div class="toggle-row"><p>PeerLoop's AI is answering and routing in this course</p><div class="switch on" onclick="this.classList.toggle('on'); toast(this.classList.contains('on') ? 'Agent on.' : 'Agent off — routing is manual now, nothing is lost.')"></div></div>
+        </section>
+
+        <!-- ============ DEPT : SPACES ============ -->
+        <section class="screen" data-persona="dept" data-screen="d-spaces">
+          <div class="topline"><h2>Department · CSE</h2>
+            <div class="icon-btn" onclick="showScreen('d-create')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+          </div>
+          <div class="kpi-grid">
+            <div class="kpi"><span class="n">6</span><span class="l">Active hubs</span></div>
+            <div class="kpi"><span class="n">243</span><span class="l">Students</span></div>
+            <div class="kpi"><span class="n">6h</span><span class="l">Median first response</span><span class="d d-up">was 11h</span></div>
+            <div class="kpi"><span class="n">8%</span><span class="l">Unresolved rate</span><span class="d d-up">target ≤10%</span></div>
+          </div>
+          <p class="section-label">HUBS</p>
+          <div class="list-row"><div><p class="lt">CSE 4790 · Industrial Training</p><p class="lc">Dr. Nasrin · CR Rifat · 38 · 3% unresolved</p></div><span class="health h-green"></span></div>
+          <div class="list-row"><div><p class="lt">CSE 4712 · Software Engineering</p><p class="lc">Dr. Kamal · CR Rifat · 41 · 12% unresolved</p></div><span class="health h-amber"></span></div>
+          <div class="list-row"><div><p class="lt">CSE 4601 · Computer Networks</p><p class="lc">Dr. Farhana · CR Mim · 44 · 6% unresolved</p></div><span class="health h-green"></span></div>
+          <div class="list-row"><div><p class="lt">CSE 4503 · Operating Systems</p><p class="lc">Dr. Imtiaz · no CR assigned · 39 · 21% unresolved</p></div><span class="health h-red"></span></div>
+          <p class="meta" style="margin-top:8px;">Red is usually a missing class rep, not a broken product — CSE 4503 has nobody at the escalation tier.</p>
+          <button class="btn-primary" style="margin-top:14px;" onclick="showScreen('d-create')">Create a course hub</button>
+        </section>
+
+        <!-- ============ DEPT : CREATE ============ -->
+        <section class="screen" data-persona="dept" data-screen="d-create">
+          <div class="back-row"><span class="icon-btn" data-goto="d-spaces"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></span><h2>New course hub</h2></div>
+          <p class="note-text">The department creates the hub and names the teacher. The teacher names the class rep, and the rep imports the roster. That chain is why there's never a duplicate hub for the same course.</p>
+          <div class="two-col">
+            <div class="form-row"><label>Course code</label><input value="CSE 4633" readonly></div>
+            <div class="form-row"><label>Term</label><input value="2026 · Fall" readonly></div>
+          </div>
+          <div class="form-row"><label>Title</label><input value="Machine Learning" readonly></div>
+          <div class="two-col">
+            <div class="form-row"><label>Batch</label><input value="Batch 47" readonly></div>
+            <div class="form-row"><label>Section</label><input value="Sec B" readonly></div>
+          </div>
+          <div class="form-row"><label>Course teacher</label><select><option>Dr. Ishmam Tashdeed</option><option>Dr. Nasrin Akter</option><option>Dr. Kamal Uddin</option></select></div>
+          <div class="form-row"><label>Escalation template</label><select><option>Standard — 6h / 24h / 24h</option><option>Relaxed — 9h / 36h / 36h</option><option>Fast — 3h / 12h / 12h</option></select></div>
+          <div class="toggle-row"><p>Let this hub relay to other sections of CSE 4633</p><div class="switch" onclick="this.classList.toggle('on')"></div></div>
+          <button class="btn-primary" style="margin-top:12px;" onclick="toast('Hub created. Join code 4633-B9TR sent to Dr. Ishmam.')">Create hub</button>
+          <p class="meta" style="text-align:center; margin-top:8px;">Generates a join code and invites the teacher.</p>
+        </section>
+
+        <!-- ============ DEPT : ANALYTICS ============ -->
+        <section class="screen" data-persona="dept" data-screen="d-analytics">
+          <div class="topline"><h2>Analytics</h2></div>
+          <p class="note-text">Aggregated and anonymised. The department sees patterns, never who asked what.</p>
+          <p class="section-label">ISSUES APPEARING IN MORE THAN ONE COURSE</p>
+          <div class="queue-card">
+            <h3>"Where do I submit…" — 4 courses, 31 requests</h3>
+            <p class="why">Submission destinations differ per course with no central notice. This is a department problem, not a course problem.</p>
+            <div class="btn-row"><button class="btn-approve" onclick="toast('Notice drafted for all 6 hubs.')">Publish a department notice</button></div>
+          </div>
+          <div class="queue-card">
+            <h3>Lab room availability — 3 courses, 14 requests</h3>
+            <p class="why">Clustered on Sundays and Tuesdays, before 10am.</p>
+            <div class="btn-row"><button class="btn-approve" onclick="toast('Sent to facilities.')">Send to facilities</button></div>
+          </div>
+
+          <p class="section-label" style="margin-top:18px;">UNRESOLVED RATE BY COURSE</p>
+          <div class="bar-row"><span class="bl">CSE 4503 · OS</span><span class="bar-track"><span class="bar-fill" style="width:84%"></span></span><span class="bv">21%</span></div>
+          <div class="bar-row"><span class="bl">CSE 4712 · SE</span><span class="bar-track"><span class="bar-fill" style="width:48%"></span></span><span class="bv">12%</span></div>
+          <div class="bar-row"><span class="bl">CSE 4601 · Networks</span><span class="bar-track"><span class="bar-fill alt" style="width:24%"></span></span><span class="bv">6%</span></div>
+          <div class="bar-row"><span class="bl">CSE 4790 · ITR</span><span class="bar-track"><span class="bar-fill alt" style="width:12%"></span></span><span class="bv">3%</span></div>
+
+          <p class="section-label" style="margin-top:18px;">CLASS REP WORKLOAD</p>
+          <div class="bar-row"><span class="bl">Rifat · 2 hubs</span><span class="bar-track"><span class="bar-fill" style="width:78%"></span></span><span class="bv">31</span></div>
+          <div class="bar-row"><span class="bl">Mim · 1 hub</span><span class="bar-track"><span class="bar-fill alt" style="width:34%"></span></span><span class="bv">14</span></div>
+          <p class="meta" style="margin-top:8px;">Rifat is carrying two hubs. A co-rep on CSE 4712 would halve that queue.</p>
+        </section>
+
+        <!-- ============ DEPT : ADMIN ============ -->
+        <section class="screen" data-persona="dept" data-screen="d-admin">
+          <div class="topline"><h2>Admin</h2></div>
+          <p class="section-label">DEFAULTS FOR NEW HUBS</p>
+          <div class="ref-row" onclick="toast('Standard — 6h / 24h / 24h')"><div><p class="t">Escalation template · Standard</p><p class="c">6h peers → 24h batch → 24h CR → approval</p></div></div>
+          <div class="ref-row" onclick="toast('Quiet hours 11pm–7am, Asia/Dhaka.')"><div><p class="t">Quiet hours · 11pm – 7am</p><p class="c">Blocking requests ignore quiet hours</p></div></div>
+          <div class="ref-row" onclick="toast('6 pushes per student per hub per day.')"><div><p class="t">Notification budget · 6 / day</p><p class="c">Extras roll into a digest instead of dropping</p></div></div>
+
+          <p class="section-label" style="margin-top:18px;">TERM ROLLOVER</p>
+          <div class="toggle-row"><p>Carry verified answers into next term as unverified</p><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="toggle-row"><p>Archive hubs automatically at term end</p><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+
+          <p class="section-label" style="margin-top:18px;">PEOPLE</p>
+          <div class="ref-row" onclick="toast('12 teacher accounts.')"><div><p class="t">Teachers · 12</p><p class="c">Invite by institutional email</p></div></div>
+          <div class="ref-row" onclick="toast('2 department admins.')"><div><p class="t">Department admins · 2</p><p class="c">Can create and archive hubs</p></div></div>
+
+          <p class="section-label" style="margin-top:18px;">SAFETY</p>
+          <div class="toggle-row"><p>AI agent enabled across the department</p><div class="switch on" onclick="this.classList.toggle('on'); toast(this.classList.contains('on') ? 'Agent on.' : 'Agent off everywhere — routing falls back to manual.')"></div></div>
+          <div class="ref-row" onclick="toast('Export includes every state change and every AI call.')"><div><p class="t">Export the audit log</p><p class="c">Every escalation and every AI decision</p></div></div>
+        </section>
+
+      </div>
+
+      <!-- ===== TAB BARS ===== -->
+      <nav class="tabbar active" data-personabar="student">
+        <button class="active" data-goto="s-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>Home</button>
+        <button data-goto="s-ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Ask</button>
+        <button data-goto="s-hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5"/><path d="M4 5.5v15"/></svg>Hub</button>
+        <button data-goto="s-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c1.5-4 4-6 7.5-6s6 2 7.5 6"/></svg>Profile</button>
+      </nav>
+
+      <nav class="tabbar" data-personabar="cr">
+        <button class="active" data-goto="c-queue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h11M8 12h11M8 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>Queue</button>
+        <button data-goto="c-requests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>Requests</button>
+        <button data-goto="c-knowledge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5"/><path d="M4 5.5v15"/></svg>Knowledge</button>
+        <button data-goto="c-space"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>Hub</button>
+      </nav>
+
+      <nav class="tabbar" data-personabar="instructor">
+        <button class="active" data-goto="i-overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 8h6V4h-6z"/></svg>Overview</button>
+        <button data-goto="i-needsme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v8l4 2"/><circle cx="12" cy="12" r="9"/></svg>Needs you</button>
+        <button data-goto="i-insights"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-6M22 19H2"/></svg>Insights</button>
+        <button data-goto="i-course"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>Course</button>
+      </nav>
+
+      <nav class="tabbar" data-personabar="dept">
+        <button class="active" data-goto="d-spaces"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z"/></svg>Hubs</button>
+        <button data-goto="d-analytics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-6M22 19H2"/></svg>Analytics</button>
+        <button data-goto="d-admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4.5-3.2 8.4-8 9.5-4.8-1.1-8-5-8-9.5V7z"/></svg>Admin</button>
+      </nav>
+
+      <!-- ===== SPACE SWITCHER SHEET ===== -->
+      <div class="sheet-scrim" id="scrim" onclick="closeSheet()"></div>
+      <div class="sheet" id="sheet">
+        <div class="grab"></div>
+        <h4 id="sheetTitle">Switch hub</h4>
+        <p class="sub" id="sheetSub">Knowledge, people and escalation are separate per hub.</p>
+        <div class="space-row" data-space="4790" onclick="pickSpace(this)">
+          <div class="sl"><span class="spacechip sc-flare">CSE 4790</span><div><p class="st">Industrial Training</p><p class="ss">Batch 47 · Sec A · student · 2 open</p></div></div>
+          <span class="check">✓</span>
+        </div>
+        <div class="space-row" data-space="4712" onclick="pickSpace(this)">
+          <div class="sl"><span class="spacechip sc-indigo">CSE 4712</span><div><p class="st">Software Engineering</p><p class="ss">Batch 47 · Sec A · student · 1 open</p></div></div>
+          <span class="check" style="visibility:hidden;">✓</span>
+        </div>
+        <button class="sheet-cta" onclick="toast('Enter a join code from your CR.')">Join a hub with a code</button>
+      </div>
+
+      <div class="toast" id="toast"></div>
+    </div>
+
+    <!-- ===== SIDE NOTES ===== -->
+    <div class="notes">
+      <h3>What this is showing</h3>
+      <p class="nsub" id="noteSub">Tap through the phone. Every screen here maps to a section of the implementation spec.</p>
+
+      <div class="noteblock active" data-note="student">
+        <ul>
+          <li><span class="num">01</span><p><b>Home is cross-hub, Hub is single-hub.</b> Your own requests from every course live on one screen with a colour chip; knowledge and members stay strictly separated per hub.</p></li>
+          <li><span class="num">02</span><p><b>The hub selector sits under the compose box.</b> Same pattern as a model switcher — always visible, one tap, never a blocking dialog. The AI can suggest a different hub if it spots another course code, but never switches for you.</p></li>
+          <li><span class="num">03</span><p><b>Fetch-first.</b> "Check for an answer", not "Post". A high-confidence hit resolves the request and notifies nobody.</p></li>
+          <li><span class="num">04</span><p><b>Pinned shows 4, expands to all.</b> The CR controls the order; everything else lives one tap away, grouped by category. PeerLoop stores the link, never the file.</p></li>
+          <li><span class="num">05</span><p><b>Answers appear by themselves.</b> Resolve a request and it becomes a card in "Already answered" — amber dot until a CR or teacher verifies it.</p></li>
+          <li><span class="num">06</span><p><b>Two escalation axes, visible in the stepper.</b> Thread A widened peers → batch → CR. Thread B skipped peers entirely because it needed authority, not knowledge.</p></li>
+          <li><span class="num">07</span><p><b>Helping tab, not a leaderboard.</b> It's how a willing helper finds work without turning contribution into a public score.</p></li>
+        </ul>
+      </div>
+
+      <div class="noteblock" data-note="cr">
+        <ul>
+          <li><span class="num">01</span><p><b>The queue is ordered by what only the CR can do.</b> Approvals first, then escalations, then answers to verify.</p></li>
+          <li><span class="num">02</span><p><b>"Stalling" is the highest-leverage panel.</b> Requests about to widen to 38 people. Answering one here prevents 38 notifications.</p></li>
+          <li><span class="num">03</span><p><b>The AI proposes, the CR disposes.</b> Every approval card shows the drafted payload and why it was raised. Nothing above the CR happens unattended.</p></li>
+          <li><span class="num">04</span><p><b>Timers are editable, with guardrails.</b> Three presets for the common case, per-stage hours behind Advanced, a 20-minute floor, and edits apply to new requests only — so a slider can't retro-fire twenty escalations.</p></li>
+          <li><span class="num">05</span><p><b>Urgency changes the clock, not the path.</b> "Today" halves every window; "Blocking" cuts it to a sixth and pings the CR in parallel. Students get a weekly quota so urgency stays meaningful.</p></li>
+          <li><span class="num">06</span><p><b>Pins have a visible cutoff.</b> The reorder list shows exactly where students stop seeing items.</p></li>
+          <li><span class="num">07</span><p><b>Knowledge doesn't wait for a question.</b> "Add knowledge" lets a rep write an answer or pin a link before anyone has asked — that's how a hub gets seeded in week one, when fetch-first has nothing to fetch from. Authored cards publish verified, with the rep's name on them.</p></li>
+          <li><span class="num">08</span><p><b>The hub switcher is in every header.</b> A rep running two courses can jump between them from Queue, Requests, Knowledge or Settings without going back to a home screen — and lands on the same screen in the other hub.</p></li>
+        </ul>
+      </div>
+
+      <div class="noteblock" data-note="instructor">
+        <ul>
+          <li><span class="num">01</span><p><b>Designed for weekly attention, not daily triage.</b> If a teacher has to check this every morning, the product has failed.</p></li>
+          <li><span class="num">02</span><p><b>Everything on "Needs you" was approved by a class rep.</b> That's the structural promise — the AI escalates to peers and to the rep, never past them.</p></li>
+          <li><span class="num">03</span><p><b>Recurring questions is the real payoff.</b> Six students asking the same thing in nine days is a course defect, and one tap turns the answer into permanent verified knowledge.</p></li>
+          <li><span class="num">04</span><p><b>"Answer &amp; publish" in one tap.</b> A teacher's reply becomes a verified card immediately, so the next student never has to ask.</p></li>
+          <li><span class="num">05</span><p><b>The resolution breakdown is the pilot metric.</b> 26% answered from the hub and 38% by peers is the number that proves the loop works — the teacher bar should stay small.</p></li>
+          <li><span class="num">06</span><p><b>Lock, and a kill switch.</b> The teacher can freeze the pace and switch the agent off entirely without losing any data.</p></li>
+        </ul>
+      </div>
+
+      <div class="noteblock" data-note="dept">
+        <ul>
+          <li><span class="num">01</span><p><b>The department creates hubs, the teacher names the rep, the rep imports the roster.</b> One chain of authority, so there's never a duplicate hub for the same course.</p></li>
+          <li><span class="num">02</span><p><b>A second course exists for a reason.</b> One real pilot hub plus one seeded hub proves the switcher, the cross-hub home feed and the department view without inventing fake users in the live class.</p></li>
+          <li><span class="num">03</span><p><b>Cross-course patterns are the institutional value.</b> "Where do I submit" appearing in four courses is a department problem, and it's invisible from inside any single course.</p></li>
+          <li><span class="num">04</span><p><b>Red usually means a missing class rep.</b> The escalation ladder has a hole in it, not a broken product.</p></li>
+          <li><span class="num">05</span><p><b>Aggregated and anonymised.</b> The department sees patterns and workloads, never who asked what.</p></li>
+          <li><span class="num">06</span><p><b>Everything is auditable.</b> Every state change and every AI call is exportable — that's what makes an agentic system defensible to an institution.</p></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var SPACES = {
+    '4790': { code:'CSE 4790', name:'Industrial Training', chip:'sc-flare',
+      sub:{ student:'Batch 47 · Sec A · 38 members · you\'re a student',
+            cr:'Class rep · Batch 47 · Sec A · 38 members',
+            instructor:'Week 6 of 12 · 38 students · CR Rifat',
+            dept:'Dr. Nasrin · CR Rifat · 38 students' },
+      row:{ student:'Batch 47 · Sec A · student · 2 open',
+            cr:'Batch 47 · Sec A · you\'re the class rep · 5 in your queue',
+            instructor:'Batch 47 · Sec A · you teach this · 2 need you',
+            dept:'Dr. Nasrin · 3% unresolved' } },
+    '4712': { code:'CSE 4712', name:'Software Engineering', chip:'sc-indigo',
+      sub:{ student:'Batch 47 · Sec A · 41 members · you\'re a student',
+            cr:'Class rep · Batch 47 · Sec A · 41 members',
+            instructor:'Week 6 of 12 · 41 students · CR Rifat',
+            dept:'Dr. Kamal · CR Rifat · 41 students' },
+      row:{ student:'Batch 47 · Sec A · student · 1 open',
+            cr:'Batch 47 · Sec A · you\'re the class rep · 9 in your queue',
+            instructor:'Batch 47 · Sec A · you teach this · 1 needs you',
+            dept:'Dr. Kamal · 12% unresolved' } }
+  };
+  var sheetContext = 'hub';
+  var activeSpace = '4790';
+  var currentPersona = 'student';
+
+  function setActive(btn){
+    var sibs = btn.parentElement.querySelectorAll('button');
+    for (var i=0;i<sibs.length;i++) sibs[i].classList.remove('active');
+    btn.classList.add('active');
+  }
+
+  function showScreen(name){
+    var all = document.querySelectorAll('.screen');
+    for (var i=0;i<all.length;i++) all[i].classList.remove('active');
+    var target = document.querySelector('[data-screen="'+name+'"]');
+    if(!target) return;
+    target.classList.add('active');
+    document.querySelector('.screens').scrollTop = 0;
+    var bar = document.querySelector('.tabbar.active');
+    if(bar){
+      var btns = bar.querySelectorAll('button');
+      for (var j=0;j<btns.length;j++){
+        btns[j].classList.toggle('active', btns[j].dataset.goto === name);
+      }
+      // keep a tab lit when on a sub-screen
+      var anyLit = bar.querySelector('button.active');
+      if(!anyLit){
+        var map = { 's-thread-a':'s-home', 's-thread-b':'s-home', 's-pinned':'s-hub', 's-answered':'s-hub', 's-card':'s-hub', 'd-create':'d-spaces', 'c-newknow':'c-knowledge' };
+        var fallback = bar.querySelector('button[data-goto="'+(map[name]||'')+'"]');
+        if(fallback) fallback.classList.add('active');
+      }
+    }
+    if(name === 's-ask') resetAsk();
+  }
+
+  function knowMode(m){
+    var seg = document.getElementById('knowModeSeg').querySelectorAll('button');
+    seg[0].classList.toggle('active', m === 'card');
+    seg[1].classList.toggle('active', m === 'link');
+    document.getElementById('knowCard').style.display = m === 'card' ? '' : 'none';
+    document.getElementById('knowLink').style.display = m === 'link' ? '' : 'none';
+  }
+
+  function setPersona(p){
+    currentPersona = p;
+    paintSpace();
+    var bars = document.querySelectorAll('.tabbar');
+    for (var i=0;i<bars.length;i++) bars[i].classList.toggle('active', bars[i].dataset.personabar === p);
+    var notes = document.querySelectorAll('.noteblock');
+    for (var j=0;j<notes.length;j++) notes[j].classList.toggle('active', notes[j].dataset.note === p);
+    var first = { student:'s-home', cr:'c-queue', instructor:'i-overview', dept:'d-spaces' }[p];
+    showScreen(first);
+  }
+
+  document.getElementById('switcher').addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-persona]');
+    if(!btn) return;
+    setActive(btn);
+    setPersona(btn.dataset.persona);
+  });
+
+  document.addEventListener('click', function(e){
+    var el = e.target.closest('[data-goto]');
+    if(el){ showScreen(el.dataset.goto); }
+  });
+
+  // segmented controls
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest('.seg button[data-seg]');
+    if(!btn) return;
+    setActive(btn);
+    var set = btn.parentElement.dataset.segset;
+    var panels = document.querySelectorAll('[data-segpanel]');
+    if(set === 'home' || set === 'cknow'){
+      for (var i=0;i<panels.length;i++){
+        var owner = panels[i].closest('.screen');
+        if(owner && owner.classList.contains('active')){
+          panels[i].style.display = (panels[i].dataset.segpanel === btn.dataset.seg) ? '' : 'none';
+        }
+      }
+    }
+  });
+
+  // priority
+  document.getElementById('prioRow').addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-prio]');
+    if(!btn) return;
+    setActive(btn);
+    var hints = {
+      P3: 'Relaxed: 12h with peers, then the full batch after 2 days.',
+      P2: 'Standard pace for this hub: 6h with peers, then the full batch.',
+      P1: 'Halved: 3h with peers, 12h to the batch, 12h to your CR.',
+      P0: 'Your CR is pinged immediately, in parallel. 1 left this week.'
+    };
+    document.getElementById('prioHint').textContent = hints[btn.dataset.prio];
+  });
+
+  // ask flow
+  function resetAsk(){
+    document.getElementById('askLoading').style.display = 'none';
+    var b = document.getElementById('askSendBtn');
+    b.style.display = ''; b.disabled = false;
+    ['outcomeMatch','outcomeNoMatch','outcomeDupe'].forEach(function(id){
+      document.getElementById(id).classList.remove('active');
+    });
+  }
+  function showOutcome(which){
+    document.getElementById('outcomeMatch').classList.toggle('active', which === 'match');
+    document.getElementById('outcomeNoMatch').classList.toggle('active', which === 'nomatch');
+    document.getElementById('outcomeDupe').classList.toggle('active', which === 'dupe');
+  }
+  document.getElementById('askSendBtn').addEventListener('click', function(){
+    this.disabled = true;
+    document.getElementById('askLoading').style.display = 'flex';
+    var self = this;
+    setTimeout(function(){
+      document.getElementById('askLoading').style.display = 'none';
+      self.style.display = 'none';
+      showOutcome(activeSpace === '4790' ? 'match' : 'nomatch');
+    }, 900);
+  });
+
+  // sheet
+  function openSheet(ctx){
+    sheetContext = ctx;
+    var rows = document.querySelectorAll('.space-row');
+    for (var i=0;i<rows.length;i++){
+      var sp = SPACES[rows[i].dataset.space];
+      rows[i].querySelector('.ss').textContent = sp.row[currentPersona] || sp.row.student;
+    }
+    document.getElementById('sheetTitle').textContent = ctx === 'ask' ? 'Ask into which hub?' : 'Switch hub';
+    document.getElementById('sheetSub').textContent = ctx === 'ask'
+      ? 'Only this hub\'s members and knowledge are used.'
+      : 'Knowledge, people and escalation are separate per hub.';
+    document.getElementById('sheet').classList.add('show');
+    document.getElementById('scrim').classList.add('show');
+  }
+  function closeSheet(){
+    document.getElementById('sheet').classList.remove('show');
+    document.getElementById('scrim').classList.remove('show');
+  }
+  function paintSpace(){
+    var s = SPACES[activeSpace];
+    var chip = document.getElementById('askSpaceChip');
+    chip.textContent = s.code;
+    chip.className = 'spacechip ' + s.chip;
+    document.getElementById('askSpaceName').textContent = s.name;
+    document.getElementById('hubCode').textContent = s.code + ' · ' + s.name;
+    document.getElementById('hubSub').textContent = s.sub.student;
+    var chips = document.querySelectorAll('.js-hub-chip');
+    for (var i=0;i<chips.length;i++){
+      chips[i].textContent = s.code;
+      chips[i].className = 'spacechip ' + s.chip + ' js-hub-chip';
+    }
+    var subs = document.querySelectorAll('.js-hub-sub');
+    for (var j=0;j<subs.length;j++){
+      subs[j].textContent = s.sub[currentPersona] || s.sub.student;
+    }
+  }
+
+  function pickSpace(row){
+    var id = row.dataset.space;
+    activeSpace = id;
+    var rows = document.querySelectorAll('.space-row');
+    for (var i=0;i<rows.length;i++){
+      rows[i].querySelector('.check').style.visibility = (rows[i] === row) ? 'visible' : 'hidden';
+    }
+    var s = SPACES[id];
+    paintSpace();
+    closeSheet();
+    toast(sheetContext === 'ask' ? 'Asking into ' + s.code : 'Now viewing ' + s.code);
+    if(sheetContext === 'ask') resetAsk();
+  }
+
+  // pace presets
+  var PRESETS = { relaxed:[9,36,36,18], standard:[6,24,24,12], fast:[3,12,12,6] };
+  document.getElementById('presetRow').addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-preset]');
+    if(!btn) return;
+    setActive(btn);
+    var v = PRESETS[btn.dataset.preset];
+    document.getElementById('dwT1').value = v[0];
+    document.getElementById('dwT2').value = v[1];
+    document.getElementById('dwT4').value = v[2];
+    document.getElementById('dwA4').value = v[3];
+    syncPace();
+  });
+  function syncPace(){
+    var t1 = document.getElementById('dwT1').value;
+    var t2 = document.getElementById('dwT2').value;
+    var t4 = document.getElementById('dwT4').value;
+    document.getElementById('paceSummary').textContent =
+      '8 peers for ' + t1 + 'h → all 38 for ' + t2 + 'h → you for ' + t4 + 'h → approval needed for the teacher.';
+  }
+  ['dwT1','dwT2','dwT4','dwA4'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', function(){
+      if(Number(this.value) < 1) this.value = 1;
+      syncPace();
+    });
+  });
+
+  paintSpace();
+
+  var toastTimer;
+  function toast(msg){
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 2300);
+  }
+</script>
+</body>
+</html>

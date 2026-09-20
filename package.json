@@ -1,0 +1,6 @@
+{
+  "name": "peerloop", "version": "1.0.0", "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": { "typecheck": "npm run typecheck --workspaces --if-present", "test": "npm -w packages/core test", "build": "npm -w apps/api run build", "dev:api": "npm -w apps/api run dev", "dev:mobile": "npm -w apps/mobile start" },
+  "engines": { "node": ">=22.18.0" }
+}

@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.*
+
+# Package manager cache
+.npm-cache/
+.npm/
+
+# Next.js
+.next/
+out/
+
+# Expo / React Native
+.expo/
+dist/
+web-build/
+
+# Metro cache
+.metro-health-check*
+
+# Turbopack / Build caches
+.turbo/
+*.tsbuildinfo
+
+# Production builds
+build/
+coverage/
+
+# Environment files
+.env
+.env*.local
+.env.development
+.env.test
+.env.production
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Dev states & runtime artifacts
+apps/api/.dev-state.json
+
+# Operating System files
+.DS_Store
+Thumbs.db
