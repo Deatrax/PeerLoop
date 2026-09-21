@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { DomainError, Engine, inputSchemas, seedDatabase, responseSchema } from '@peerloop/core';
+import { classify, DomainError, Engine, inputSchemas, seedDatabase, responseSchema, type LLMProvider, type Priority } from '@peerloop/core';
 import { ZodError } from 'zod';
+import { sql } from 'drizzle-orm';
+import { database } from '../../../../db/client';
 import { withAuth, authRoute } from '../../../../lib/auth';
 import { transact, requestScope } from '../../../../lib/store';
 import { dispatchNotifications } from '../../../../lib/dispatch';
@@ -9,6 +11,17 @@ import { serverNow, advanceClock } from '../../../../lib/clock';
 export const runtime='nodejs';
 function cors(req:Request){const origin=req.headers.get('origin')??'';const allowed=(process.env.CORS_ORIGINS??'http://localhost:8081,http://localhost:19006').split(',');const dev=process.env.NODE_ENV!=='production'&&/^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin);return {'Access-Control-Allow-Origin':allowed.includes(origin)||dev?origin:allowed[0],Vary:'Origin','Access-Control-Allow-Methods':'GET,POST,PATCH,PUT,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type,X-Peerloop-Time-Scale,Idempotency-Key'};}
 export async function OPTIONS(req:NextRequest){return new NextResponse(null,{status:204,headers:cors(req)});}
+// The space code is the only stored value the classifier needs, so one cheap read keeps the
+// model call outside the transaction. Anything unexpected falls through and the engine
+// classifies as before, just holding locks while it does.
+async function preClassify(body:unknown,provider:LLMProvider){
+  const data=body as {space_id?:unknown;body_text?:unknown;priority_requested?:unknown};
+  if(typeof data.space_id!=='string'||typeof data.body_text!=='string')return undefined;
+  const rows=await database().execute(sql`select code from spaces where id=${data.space_id}`);
+  const code=rows[0]?.code;
+  if(typeof code!=='string')return undefined;
+  return {text:data.body_text,value:await classify(data.body_text,{code,priority_requested:data.priority_requested as Priority|undefined},provider)};
+}
 async function handler(req:NextRequest){
   try{
     const path=req.nextUrl.pathname.replace('/api/v1/','');
@@ -22,9 +35,15 @@ async function handler(req:NextRequest){
       let now=await serverNow();
       if(path==='dev/advance'){if(req.method!=='POST')throw new DomainError('METHOD','Use POST.',405);now=await advanceClock(inputSchemas.advance.parse(body).hours);}
       const scope=await requestScope(path,body,user_id);
+      const provider=process.env.MODEL_ENDPOINT?new RemoteProvider():undefined;
+      // Classify before opening the transaction. Inside it, a multi-second model call would
+      // hold the space advisory lock and the users row locks, stalling every other request.
+      const classified=provider&&req.method==='POST'&&path==='requests'
+        ? await preClassify(body,provider)
+        : undefined;
       const result=await transact(async db=>{
         const scale=development?Math.min(3600,Math.max(1,Number(request.headers.get('X-Peerloop-Time-Scale'))||1)):1;
-        const engine=new Engine(db,{user_id,now,time_scale:scale,provider:process.env.MODEL_ENDPOINT?new RemoteProvider():undefined,measure:()=>performance.now()});
+        const engine=new Engine(db,{user_id,now,time_scale:scale,provider,classified,measure:()=>performance.now()});
         if(path==='dev/inspect')return db.agent_runs.slice(-20);
         if(path==='dev/advance')return {swept:engine.sweep(undefined,200)};
         return responseSchema(req.method,req.nextUrl.pathname).parse(await engine.handle(req.method,req.nextUrl.pathname+req.nextUrl.search,body));

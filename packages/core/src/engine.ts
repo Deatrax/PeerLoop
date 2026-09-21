@@ -2,6 +2,7 @@ import { assertMethod } from "./http-contract";
 import type {
   Analytics,
   ApprovalTask,
+  Classification,
   CreateOutcome,
   Database,
   EscalationPolicy,
@@ -50,6 +51,9 @@ export interface EngineContext {
   time_scale?: number;
   provider?: LLMProvider;
   measure?: () => number;
+  // Classification computed before the transaction opened, keyed by the text it describes so
+  // an internal re-create (a move, say) cannot reuse another request's result.
+  classified?: { text: string; value: Classification };
 }
 export class Engine {
   private sequence = 0;
@@ -529,11 +533,16 @@ export class Engine {
         "You can ask ten requests per hub each day.",
         429,
       );
-    const classification = await classify(
-      data.body_text,
-      { code: space.code, priority_requested: data.priority_requested },
-      this.ctx.provider,
-    );
+    // A remote provider means a network call. Callers can classify before opening their
+    // transaction and hand the result in, so a slow model never holds database locks.
+    const classification =
+      this.ctx.classified?.text === data.body_text
+        ? this.ctx.classified.value
+        : await classify(
+            data.body_text,
+            { code: space.code, priority_requested: data.priority_requested },
+            this.ctx.provider,
+          );
     if (data.category) {
       classification.category = data.category;
       if (["LOGISTICS_AUTHORITY", "CAMPUS_ISSUE"].includes(data.category))
