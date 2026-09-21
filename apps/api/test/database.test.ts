@@ -70,7 +70,8 @@ test("PostgreSQL migration accepts seed, constraints and real pipeline rows", as
     const engine=new Engine(state,{user_id:'arisha',now:Date.parse('2026-09-20T06:00:00Z')});
     await engine.create({space_id:'cse4790',body_text:'How does orbital titanium scheduling work?',reject_knowledge:true});
   },{scope:{space_id:'cse4790',user_id:'arisha'}},connection);
-  assert.equal((await pg.query<{count:number}>('select count(*)::int as count from notifications where attempts=0')).rows[0].count,10);
+  // PENDING isolates what this pipeline run queued from the seed's already-delivered inbox rows.
+  assert.equal((await pg.query<{count:number}>(`select count(*)::int as count from notifications where attempts=0 and delivery_state='PENDING'`)).rows[0].count,10);
   await assert.rejects(()=>transact(state=>{state.request_events[0].reason='changed';},{},connection),/append-only/);
   const compiled=dialect.sqlToQuery(metricsRollupSQL);
   await pg.query(compiled.sql,compiled.params);

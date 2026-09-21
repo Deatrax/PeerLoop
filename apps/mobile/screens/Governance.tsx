@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { router, useLocalSearchParams, type Href } from "expo-router";
-import { View, Share } from "react-native";
+import { View, Share, Platform } from "react-native";
 import {
+  defaultPolicy,
   terminalStates,
   type Analytics,
   type ApprovalTask,
@@ -9,6 +10,7 @@ import {
   type EscalationPolicy,
   type KnowledgeItem,
   type Request,
+  type RequestClass,
   type SearchHit,
   type Space,
 } from "@peerloop/core";
@@ -141,6 +143,7 @@ function ApprovalCard({ task }: { task: ApprovalTask }) {
 }
 export function Queue() {
   const space = useActiveSpace();
+  const scale = useSession((s) => s.scale);
   const { data } = useResource(async () => {
     if (!space) return null;
     const repo = getRepository();
@@ -193,7 +196,9 @@ export function Queue() {
               (r) =>
                 ["T1", "T2"].includes(r.audience_tier) &&
                 r.next_escalation_at &&
-                Date.parse(r.next_escalation_at) - Date.now() < 3600000,
+                // "within an hour of widening" is an hour of *simulated* time: under the
+                // fast clock an hour of dwell elapses in an hour/scale of wall time.
+                Date.parse(r.next_escalation_at) - Date.now() < 3600000 / scale,
             )
             .map((r) => (
               <QueueCard key={r.id} request={r} />
@@ -435,42 +440,48 @@ export function KnowledgeComposer() {
         })
         .catch(useSession.getState().fail);
   }, [edit]);
-  const check = () =>
+  const persist = async () => {
+    if (!space) return;
+    if (edit)
+      await getRepository().call("PATCH", `/knowledge/${edit}`, {
+        question,
+        body,
+        category,
+      });
+    else if (mode === "Pin a link")
+      await getRepository().pinReference(space.id, {
+        title: question,
+        url,
+        note: body,
+        category,
+        top_four: top,
+      });
+    else
+      await getRepository().authorCard(space.id, {
+        question,
+        body,
+        category,
+        expires_in_days: Number(days),
+        notify_space: notify,
+      });
+    useSession
+      .getState()
+      .notify(
+        edit ? "Answer updated." : "Knowledge published and attributed to you.",
+      );
+    router.back();
+  };
+  // §8.2: the near-duplicate guard runs as part of publishing, not as a separate tap.
+  // A hit holds the publish once and offers the existing card; tapping again publishes anyway.
+  const submit = () =>
     void run(async () => {
       if (!space) return;
-      setDuplicates(await getRepository().checkCard(space.id, question));
+      if (edit || mode === "Pin a link" || checked) return persist();
+      const hits = await getRepository().checkCard(space.id, question);
+      setDuplicates(hits);
       setChecked(true);
+      if (!hits.length) await persist();
     });
-  const publish = () =>
-    void run(
-      async () => {
-        if (!space) return;
-        if (edit)
-          await getRepository().call("PATCH", `/knowledge/${edit}`, {
-            question,
-            body,
-            category,
-          });
-        else if (mode === "Pin a link")
-          await getRepository().pinReference(space.id, {
-            title: question,
-            url,
-            note: body,
-            category,
-            top_four: top,
-          });
-        else
-          await getRepository().authorCard(space.id, {
-            question,
-            body,
-            category,
-            expires_in_days: Number(days),
-            notify_space: notify,
-          });
-        router.back();
-      },
-      edit ? "Answer updated." : "Knowledge published and attributed to you.",
-    );
   return (
     <Screen title={edit ? "Edit answer" : "Add knowledge"} back>
       <Heading>A useful answer lasts.</Heading>
@@ -559,16 +570,16 @@ export function KnowledgeComposer() {
             ? "Save changes"
             : mode === "Pin a link"
               ? "Pin this reference"
-              : checked
-                ? "Publish verified answer"
-                : "Check for existing answers"
+              : checked && duplicates.length > 0
+                ? "Publish anyway"
+                : "Publish verified answer"
         }
         disabled={
           busy ||
           !question.trim() ||
           (mode === "Write an answer" && !body.trim())
         }
-        onPress={edit || mode === "Pin a link" || checked ? publish : check}
+        onPress={submit}
       />
     </Screen>
   );
@@ -1207,6 +1218,38 @@ export function Admin() {
   return (
     <Screen title="Admin" scoped={false}>
       <Heading>Keep the pilot in good shape.</Heading>
+      <Section title="Defaults for new hubs" />
+      <NoteText>
+        Every hub created here starts with these ladders. A class representative
+        can change the pace afterwards; an instructor can lock it.
+      </NoteText>
+      {(["KNOWLEDGE", "AUTHORITY", "HYBRID"] as RequestClass[]).map((cls) => (
+        <ListRow
+          key={cls}
+          title={
+            cls === "KNOWLEDGE"
+              ? "Knowledge · widens across peers"
+              : cls === "AUTHORITY"
+                ? "Authority · straight to a decision"
+                : "Hybrid · widens, then needs a decision"
+          }
+          subtitle={defaultPolicy(cls, cls, Date.now())
+            .steps.map((s) =>
+              s.dwell_minutes === null
+                ? `${s.tier} approval`
+                : `${s.tier} ${s.dwell_minutes >= 60 ? `${s.dwell_minutes / 60}h` : `${s.dwell_minutes}m`}`,
+            )
+            .join(" → ")}
+        />
+      ))}
+      <ListRow
+        title="Quiet hours"
+        subtitle="23:00–07:00 Asia/Dhaka, for “Needed today” and below. Blocking requests ignore them."
+      />
+      <ListRow
+        title="Grace period"
+        subtitle="45 minutes after a reply or a claim before the clock resumes."
+      />
       <Section title="Term rollover" />
       <NoteText>
         Archive the current hubs and open the next term. Verified knowledge is
@@ -1239,11 +1282,24 @@ export function Admin() {
               "GET",
               `/orgs/${org}/audit`,
             );
-            await Share.share({
-              message: JSON.stringify(audit, null, 2),
-              title: "PeerLoop audit export",
-            });
-          })
+            const payload = JSON.stringify(audit, null, 2);
+            // react-native-web has no Share implementation, so the web target downloads
+            // the export instead. Both paths keep the audit trail exportable (§17).
+            if (Platform.OS === "web") {
+              const url = URL.createObjectURL(
+                new Blob([payload], { type: "application/json" }),
+              );
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = "peerloop-audit.json";
+              link.click();
+              URL.revokeObjectURL(url);
+            } else
+              await Share.share({
+                message: payload,
+                title: "PeerLoop audit export",
+              });
+          }, "Audit export ready.")
         }
       />
       <Section title="People" />

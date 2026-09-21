@@ -37,6 +37,13 @@ import {
   type EscalationDecision,
 } from "./escalation/reducer";
 import { notificationChannel } from "./notify/budget";
+// `?range=` accepts a day count ("30") or a shorthand ("7d", "30d"). Anything else,
+// including "term", means the whole term and returns undefined.
+function parseRangeDays(range: string | null): number | undefined {
+  if (!range) return undefined;
+  const days = Number(/^(\d+)d?$/.exec(range.trim())?.[1]);
+  return Number.isFinite(days) && days > 0 ? days : undefined;
+}
 export interface EngineContext {
   user_id: string;
   now: number;
@@ -191,14 +198,21 @@ export class Engine {
       r.audience_tier !== "T4" &&
       member?.muted_until &&
       Date.parse(member.muted_until) > this.ctx.now;
-    const quiet = user
-      ? inQuietHours(this.ctx.now, {
-          start: user.preferences.quiet_start,
-          end: user.preferences.quiet_end,
-          tz: r.policy_snapshot.quiet_hours.tz,
-          applies_below_priority: "P1",
-        })
-      : false;
+    // §7.3: quiet hours only apply at or below the policy's applies_below_priority; P0 ignores them.
+    const quietApplies =
+      r.priority !== "P0" &&
+      Number(r.priority[1]) >=
+        Number(r.policy_snapshot.quiet_hours.applies_below_priority[1]);
+    const quiet =
+      user && quietApplies
+        ? inQuietHours(this.ctx.now, {
+            start: user.preferences.quiet_start,
+            end: user.preferences.quiet_end,
+            tz: r.policy_snapshot.quiet_hours.tz,
+            applies_below_priority:
+              r.policy_snapshot.quiet_hours.applies_below_priority,
+          })
+        : false;
     const tagFiltered =
       user?.preferences.tags_only &&
       r.author_id !== user_id &&
@@ -218,6 +232,7 @@ export class Engine {
               this.ctx.now,
               member?.notification_budget_override ?? 6,
               approval,
+              r.policy_snapshot.quiet_hours.tz,
             );
     this.db.notifications.push({
       id: this.id("notification"),
@@ -640,7 +655,7 @@ export class Engine {
         undefined,
         "AGENT",
       );
-    else if (!data.skip_duplicate && duplicates.some((d) => d.score >= 0.86)) {
+    else if (!data.skip_duplicate && duplicates.some((d) => d.mergeable)) {
       outcome = "DUPLICATE_PROMPT";
       this.event(
         r,
@@ -884,12 +899,19 @@ export class Engine {
     );
     return child;
   }
-  analytics(space_id: string): Analytics {
+  analytics(space_id: string, since_days?: number): Analytics {
     this.guard(space_id, "analytics");
-    return this.computeAnalytics(space_id);
+    return this.computeAnalytics(space_id, since_days);
   }
-  computeAnalytics(space_id: string): Analytics {
-    const rows = this.db.requests.filter((r) => r.space_id === space_id);
+  // §13 `?range=` — a window in days. Omitted means the whole term, which is what
+  // the pilot metrics in §16 are measured over.
+  computeAnalytics(space_id: string, since_days?: number): Analytics {
+    const cutoff = since_days ? this.ctx.now - since_days * 86400000 : null;
+    const rows = this.db.requests.filter(
+      (r) =>
+        r.space_id === space_id &&
+        (cutoff === null || Date.parse(r.created_at) >= cutoff),
+    );
     const groups: { question: string; count: number; request_ids: string[] }[] =
       [];
     for (const r of rows) {
@@ -1265,7 +1287,8 @@ export class Engine {
           { Relaxed: 1.5, Standard: 1, Fast: 0.6 }[data.preset!];
         return { pace_override: space.pace_override };
       }
-      if (p[2] === "analytics") return this.analytics(sid);
+      if (p[2] === "analytics")
+        return this.analytics(sid, parseRangeDays(q.get("range")));
       if (p[2] === "knowledge") {
         if (p[3] === "recurring") {
           this.guard(sid, "analytics");

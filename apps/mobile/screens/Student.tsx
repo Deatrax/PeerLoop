@@ -339,6 +339,9 @@ export function Ask() {
           )}
           {outcome.agent_outcome === "SERVE" ? (
             <>
+              <NoteText>
+                Answered from what this hub already knows. Nobody was notified.
+              </NoteText>
               <PrimaryButton
                 label="That’s what I needed"
                 onPress={() =>
@@ -602,7 +605,7 @@ export function Profile() {
   const [start, setStart] = useState(user?.preferences.quiet_start ?? "23:00"),
     [end, setEnd] = useState(user?.preferences.quiet_end ?? "07:00");
   return (
-    <Screen title="Profile">
+    <Screen title="Profile" scoped={false}>
       <Heading>{user?.name}</Heading>
       <Copy muted>{user?.student_id} · Your contribution stays private.</Copy>
       <StatRow style={{ marginVertical: 18 }}>

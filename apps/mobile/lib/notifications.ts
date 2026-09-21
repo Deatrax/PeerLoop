@@ -36,7 +36,7 @@ export async function observeNotifications() {
   const open=(response: import('expo-notifications').NotificationResponse)=>{
     if(!useSession.getState().user)return;
     const data=response.notification.request.content.data ?? {};
-    if(typeof data.request_id==='string')router.push(`/thread/${encodeURIComponent(data.request_id)}` as Href);
+    if(typeof data.request_id==='string')router.push(`/request/${encodeURIComponent(data.request_id)}` as Href);
     else if(typeof data.card_id==='string')router.push(`/card/${encodeURIComponent(data.card_id)}` as Href);
     void notifications.clearLastNotificationResponseAsync();
   };
