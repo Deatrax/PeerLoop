@@ -61,13 +61,19 @@ export async function transact<T>(
       await tx.execute(
         sql`select id from requests where next_escalation_at <= now() and state in ('ROUTED','ESCALATED','IN_PROGRESS') order by next_escalation_at limit 200 for update skip locked`,
       );
-    const raw: Record<string, unknown> = {};
-    for (const table of tableOrder) {
-      const rows = await tx.execute(
-        sql`select row_to_json(t) as row from ${sql.identifier(table)} t ${scope ? sql`where ${scopePredicate(table,scope)}` : sql``}`,
-      );
-      raw[table] = rows.map((r) => r.row);
-    }
+    // One round trip for the whole scope. Loading each table separately cost 15 sequential
+    // round trips, which is invisible on localhost and ruinous over a remote database — and
+    // it is all spent holding the advisory lock taken above.
+    const loaded = await tx.execute(
+      sql`select ${sql.join(
+        tableOrder.map(
+          (table) =>
+            sql`(select coalesce(json_agg(row_to_json(t)), '[]'::json) from ${sql.identifier(table)} t ${scope ? sql`where ${scopePredicate(table,scope)}` : sql``}) as ${sql.identifier(table)}`,
+        ),
+        sql`, `,
+      )}`,
+    );
+    const raw = loaded[0] as Record<string, unknown>;
     // PostgreSQL JSON serialization boundary: schema.ts defines the stored shapes.
     const before = raw as unknown as Database;
     const state =
@@ -85,6 +91,9 @@ export async function transact<T>(
       const oldRows = before[table] as unknown as Row[];
       const index = new Map(oldRows.map(row => [JSON.stringify(pk.map(k => row[k])), row]));
       const rows = state[table] as unknown as Row[];
+      // Writing row by row cost one round trip per changed row — creating a request fans out
+      // to ~20 of them. Rows sharing a column signature go up in a single statement instead.
+      const batches = new Map<string, { rows: Row[]; update: Set<string> }>();
       for (const row of rows) {
         const old = options.reset
           ? undefined
@@ -93,15 +102,24 @@ export async function transact<T>(
         if (old && (table === "request_events" || table === "agent_runs"))
           throw new Error("Audit records are append-only.");
         const cols = Object.keys(row);
+        const batch = batches.get(cols.join(",")) ?? { rows: [], update: new Set<string>() };
+        batch.rows.push(row);
+        // Re-setting an unchanged column to its own value is harmless, so one shared update
+        // list per batch is safe even when different rows changed different columns.
+        for (const c of cols)
+          if (!pk.includes(c) && (!old || JSON.stringify(old[c]) !== JSON.stringify(row[c])))
+            batch.update.add(c);
+        batches.set(cols.join(","), batch);
+      }
+      for (const [signature, batch] of batches) {
+        const cols = signature.split(",");
         const conflict = pk.map((k) => sql.identifier(k));
-        const update = cols
-          .filter((c) => !pk.includes(c) && (!old || JSON.stringify(old[c]) !== JSON.stringify(row[c])))
-          .map(
-            (c) => sql`${sql.identifier(c)} = excluded.${sql.identifier(c)}`,
-          );
-        // json_populate_record delegates JSON/date conversion to the actual table types.
+        const update = [...batch.update].map(
+          (c) => sql`${sql.identifier(c)} = excluded.${sql.identifier(c)}`,
+        );
+        // json_populate_recordset delegates JSON/date conversion to the actual table types.
         const tail =
-          table === "request_events" || table === "agent_runs"
+          table === "request_events" || table === "agent_runs" || !update.length
             ? sql`do nothing`
             : sql`do update set ${sql.join(update, sql`, `)}`;
         await tx.execute(
@@ -111,7 +129,7 @@ export async function transact<T>(
           )}) select ${sql.join(
             cols.map((c) => sql.identifier(c)),
             sql`, `,
-          )} from json_populate_record(null::${sql.identifier(table)}, ${JSON.stringify(row)}::json) on conflict (${sql.join(conflict, sql`, `)}) ${tail}`,
+          )} from json_populate_recordset(null::${sql.identifier(table)}, ${JSON.stringify(batch.rows)}::json) on conflict (${sql.join(conflict, sql`, `)}) ${tail}`,
         );
       }
     }
