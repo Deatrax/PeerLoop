@@ -60,7 +60,21 @@ screen, or toggle it in the dev console. Dead conference Wi-Fi cannot kill the d
 | `CRON_SECRET` | Bearer token guarding `/api/cron/:job`. |
 | `INSTITUTIONAL_DOMAINS` | Comma-separated allowlist for magic-link sign-up. |
 | `CORS_ORIGINS` | Expo dev origins. |
-| `MODEL_ENDPOINT`, `MODEL_API_KEY` | Optional. When unset, the deterministic `HeuristicProvider` runs and the whole system works with zero keys. |
+| `MODEL_ENDPOINT`, `MODEL_NAME`, `MODEL_API_KEY` | Optional. `MODEL_ENDPOINT` is the gate: unset it and the deterministic `HeuristicProvider` runs, so the whole system works with zero keys. Set it to an OpenAI-compatible chat-completions URL to use a model for classification only. |
+
+### What the model does, and does not, do
+
+The model is used for **one step**: classifying a request (§10 Step 1). Retrieval, duplicate
+detection, routing and the serve/suggest/route decision are deterministic code, so a class rep
+can always be shown why someone was picked, and the same input gives the same answer. The
+`agent_runs` table records this — only the `classify` row carries a model name and token counts.
+
+An answer is never generated from model world-knowledge. It must cite a retrieved knowledge
+item; if nothing was retrieved, the only legal action is to route to people.
+
+If the model errors, times out or returns malformed JSON, `classify()` retries once and then
+falls back to the heuristic with `needs_review` set, which surfaces the request in the CR
+queue. A model outage slows nothing down and blocks no student.
 
 `apps/mobile/.env` only ever holds `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_EAS_PROJECT_ID`.
 No secret, key or database URL may enter the Expo bundle — it is trivially decompilable.

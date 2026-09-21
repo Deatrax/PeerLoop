@@ -1,4 +1,18 @@
-# PeerLoop — unattended implementation session
+# PeerLoop — implementation log
+
+> **Session 2 (2026-09-21, morning, with you present): the model is now wired.**
+> `RemoteProvider` is a real OpenAI chat-completions adapter (`gpt-5.6-sol` via `MODEL_NAME`),
+> classification only. Verified live: `MATERIAL/KNOWLEDGE`, `CAMPUS_ISSUE/AUTHORITY`, `P0`
+> detection, and **`HYBRID`** — the class the heuristic cannot produce, so the T1 4h → T2 8h →
+> T4 12h ladder is reachable for the first time. `agent_runs` now logs real token counts, and
+> only the `classify` row carries a model name; the deterministic steps say `deterministic-v1`,
+> which is what proves §10's "the model is not in the routing loop". A forced model failure
+> falls back to the heuristic with `needs_review` set, so an outage blocks no student.
+> Model config is set in Vercel production and deployed. Details in §9.
+
+---
+
+# Session 1 — unattended implementation
 
 Session date: 2026-09-21 (overnight, unattended)
 Operator instruction: complete the implementation; do not commit; make no model-service
@@ -297,3 +311,65 @@ T5  ESCALATED -> AWAITING_APPROVAL  SYSTEM  A human must approve sending this to
 ```
 
 The database was re-seeded afterwards, so none of this test traffic is left in the demo data.
+
+---
+
+## 9. Session 2 — wiring the model (2026-09-21, with the operator present)
+
+### What was broken
+`RemoteProvider` posted `{task, text, context}` — no `model`, no `messages`. Against
+`api.openai.com` that is a 400. Core's `classify()` retries once then falls back to the
+heuristic, so the system would have *looked* fine while never once using the model. That is
+the worst failure mode: silent.
+
+### What it is now
+An OpenAI chat-completions adapter. `MODEL_NAME` (default `gpt-5.6-sol`) selects the model,
+`response_format: json_object` constrains the reply, and the system prompt carries the §10
+Step 1 contract plus the category / class / priority rules from §5.1. It returns parsed JSON
+and core's zod schema validates it exactly as before.
+
+### Decisions
+
+**D11 — The model classifies and nothing else.** Retrieval, dedupe, routing and the
+serve/suggest/route decision stay deterministic, per §10 Step 4 ("routing must be reproducible
+and explainable to a CR"). The prompt says so explicitly so the model does not try to answer.
+
+**D12 — `agent_runs.model` now depends on the step.** It previously stamped the provider name
+on every row, including `route` and `dedupe`, implying the model was in loops it is not in.
+Only `classify` reports the model; everything else reports `deterministic-v1`. §10 calls this
+table the demo's credibility, so it has to be literally true.
+
+**D13 — Token usage via an optional `lastUsage` on the provider interface.** `tokens_in` and
+`tokens_out` were hardcoded `0` despite §12 declaring them. Deterministic providers leave
+`lastUsage` undefined and still log zeroes, so nothing else changed.
+
+**D14 — Kept the 8-second timeout and the single retry.** A live classify costs ~4.5s, so the
+Ask flow is noticeably slower with the model on than off. The fallback makes that safe rather
+than fatal. If it feels slow in the demo, unset `MODEL_ENDPOINT` and the heuristic answers
+instantly — the demo script does not depend on the model.
+
+### Verified live
+
+| Input | Result |
+|---|---|
+| "Does anyone have the Week 6 slides?" | `MATERIAL` / `KNOWLEDGE` / `P2` |
+| "Can we get a Lab 3 deadline extension? Does anyone know if the teacher already allowed one?" | `LOGISTICS_AUTHORITY` / **`HYBRID`** — routed to T1 with a shortlist of 10, where the heuristic would have sent it straight to the CR at T4 |
+| "The projector in Lab 3 is dead" | `CAMPUS_ISSUE` / `AUTHORITY` |
+| "blocked, portal rejects my PDF, deadline in 2 hours" | `P0`, reason "Submission blocked by portal with deadline in two hours" |
+| Forced bad model name | fell back to `INFORMATION` / `KNOWLEDGE` / `P2` with `needs_review: true` |
+
+`agent_runs` for one real request: `classify openai:gpt-5.6-sol 445 in / 80 out`, and
+`retrieve` / `dedupe` / `route` / `decide` all `deterministic-v1 0 / 0`.
+
+### Still open after session 2
+Unchanged from §6 except that the model item is now done: pgvector + `embedding_backfill`,
+editable Admin defaults, `?assignee=`, instructor-flagged space creation, unused font weights.
+Two worth naming:
+
+- **Production auth is not functional.** `dev-login` is disabled when `NODE_ENV=production`
+  and magic link needs `EMAIL_WEBHOOK_URL`, which is empty. So nobody can sign in to the
+  deployed API. The demo runs against a local API or in offline mode. Wire the email webhook
+  before the deployed API is usable by a real person.
+- **The deployed build is ahead of the committed code.** The Vercel CLI uploads the working
+  directory, not git, so the session-2 provider changes are live in production while still
+  uncommitted locally.

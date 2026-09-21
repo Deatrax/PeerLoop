@@ -171,12 +171,18 @@ export class Engine {
       id: this.id("run"),
       request_id: r.id,
       step,
-      model: this.ctx.provider?.name ?? "deterministic-v1",
+      // Only classify can involve a model. §10 keeps retrieve/dedupe/route/decide
+      // deterministic, and this column is what proves it.
+      model:
+        step === "classify"
+          ? (this.ctx.provider?.name ?? "heuristic-v1")
+          : "deterministic-v1",
       prompt_hash: `${step}-v1`,
       output_json: JSON.parse(JSON.stringify(output)) as Json,
       latency_ms: elapsed,
-      tokens_in: 0,
-      tokens_out: 0,
+      // Only the step that actually called the model carries usage; the rest are deterministic.
+      tokens_in: step === "classify" ? (this.ctx.provider?.lastUsage?.tokens_in ?? 0) : 0,
+      tokens_out: step === "classify" ? (this.ctx.provider?.lastUsage?.tokens_out ?? 0) : 0,
       error,
       created_at: this.iso(),
     });

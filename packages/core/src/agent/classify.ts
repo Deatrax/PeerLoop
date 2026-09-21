@@ -2,7 +2,9 @@ import { classificationSchema } from '../schemas';
 import type { Classification, Priority } from '../types';
 import { tokenize } from '../knowledge/search';
 export interface ClassifyContext { code:string; priority_requested?:Priority }
-export interface LLMProvider { name:string; classify(text:string,ctx:ClassifyContext):Promise<unknown> }
+// lastUsage lets the API log real token counts to agent_runs (§10). Deterministic providers
+// leave it undefined and log zeroes.
+export interface LLMProvider { name:string; lastUsage?:{tokens_in:number;tokens_out:number}; classify(text:string,ctx:ClassifyContext):Promise<unknown> }
 export class HeuristicProvider implements LLMProvider {
   name='heuristic-v1';
   async classify(text:string,ctx:ClassifyContext):Promise<Classification>{

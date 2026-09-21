@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { SpaceSummary, User } from "@peerloop/core";
+import { DomainError, type SpaceSummary, type User } from "@peerloop/core";
 import { configureRepository, getRepository, saveToken } from "../lib/repo";
 interface Session {
   user: User | null;
@@ -130,6 +130,11 @@ export const useSession = create<Session>((set, get) => ({
   },
   fail(error) {
     set({ error: error instanceof Error ? error.message : String(error) });
+    // The user object lives in AsyncStorage but the token lives in SecureStore, so they can
+    // fall out of sync — an expired or cleared token used to leave you on a dashboard that
+    // 401s forever with no way back. Treat "not authenticated" as signed out.
+    if (error instanceof DomainError && error.status === 401 && get().user)
+      void get().logout();
   },
 }));
 export function useActiveSpace() {
