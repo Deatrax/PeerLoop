@@ -9,6 +9,7 @@ import {
   Copy,
   Field,
   Heading,
+  label,
   LinkButton,
   Loading,
   NoteText,
@@ -53,7 +54,7 @@ export function ThreadScreen() {
       <Row>
         <Pill>{r.priority}</Pill>
         <Pill tone={r.state === "RESOLVED" ? "resolved" : "flare"}>
-          {r.state.toLowerCase().replaceAll("_", " ")}
+          {label(r.state)}
         </Pill>
       </Row>
       <Stepper request={r} />
@@ -253,7 +254,7 @@ export function AnswerCard() {
           <Heading>{data.title}</Heading>
           <Row>
             <Pill tone={data.status === "VERIFIED" ? "resolved" : "amber"}>
-              {data.status.toLowerCase()}
+              {label(data.status)}
             </Pill>
             <Pill>{data.retrieval_hits} times found</Pill>
           </Row>

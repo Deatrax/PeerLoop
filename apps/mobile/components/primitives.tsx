@@ -632,7 +632,7 @@ export function QueueCard({
       <Row>
         <SpaceChip space={spaces.find((s) => s.id === request.space_id)} />
         {request.category ? (
-          <Tag>{request.category.toLowerCase().replaceAll("_", " ")}</Tag>
+          <Tag>{label(request.category)}</Tag>
         ) : null}
       </Row>
       <Row style={{ justifyContent: "space-between" }}>
@@ -865,6 +865,10 @@ export function BackRow({ title }: { title: string }) {
     </Row>
   );
 }
+// Enum-ish API values rendered as prose. Tolerates a missing value because one absent field
+// on one row used to throw during render and white-screen the whole tab.
+export const label = (value?: string | null) =>
+  (value ?? "").toLowerCase().replaceAll("_", " ");
 export function useAction() {
   const [busy, setBusy] = useState(false);
   return {

@@ -197,13 +197,15 @@ export function DataList<T>({
   render: (item: T) => React.ReactElement;
   keyFor: (item: T) => string;
 }) {
+  // Screen already provides the ScrollView, so a FlatList here is a nested VirtualizedList:
+  // React Native warns about it and, with scrolling disabled, it renders every row anyway.
+  // A keyed map gives the same output without the warning.
   return (
-    <FlatList
-      scrollEnabled={false}
-      data={data}
-      keyExtractor={keyFor}
-      renderItem={({ item }) => render(item)}
-    />
+    <>
+      {data.map((item) => (
+        <React.Fragment key={keyFor(item)}>{render(item)}</React.Fragment>
+      ))}
+    </>
   );
 }
 const tabs = {

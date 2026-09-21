@@ -26,6 +26,7 @@ import {
   Field,
   Heading,
   Kpi,
+  label,
   LinkButton,
   ListRow,
   Loading,
@@ -842,7 +843,7 @@ export function Settings({ instructor = false }: { instructor?: boolean }) {
         render={(m) => (
           <ListRow
             title={m.name}
-            subtitle={`${m.role.toLowerCase()} · ${m.status.toLowerCase()}`}
+            subtitle={`${label(m.role)} · ${label(m.status)}`}
             right={
               instructor && m.role === "STUDENT" ? (
                 <LinkButton
@@ -989,7 +990,7 @@ export function AnalyticsPanel({ analytics: a }: { analytics: Analytics }) {
       {a.origins.map((o) => (
         <BarRow
           key={o.origin}
-          label={o.origin.toLowerCase()}
+          label={label(o.origin)}
           value={o.count}
           max={a.total}
         />

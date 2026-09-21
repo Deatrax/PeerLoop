@@ -25,6 +25,7 @@ import {
   Field,
   Heading,
   Kpi,
+  label,
   LinkButton,
   ListRow,
   Loading,
@@ -248,9 +249,7 @@ export function Ask() {
               }
             >
               <Pill>
-                {(category ?? classification.category)
-                  .toLowerCase()
-                  .replaceAll("_", " ")}{" "}
+                {label(category ?? classification.category)}{" "}
                 · edit
               </Pill>
             </Action>
@@ -443,7 +442,7 @@ export function KnowledgeRows({ items }: { items: KnowledgeItem[] }) {
           subtitle={
             k.kind === "PINNED_REF"
               ? "Link only · added by your course team"
-              : `${k.status.toLowerCase()} · ${k.origin === "AUTHORED" ? "written by your course team" : "from a resolved request"}`
+              : `${label(k.status)} · ${k.origin === "AUTHORED" ? "written by your course team" : "from a resolved request"}`
           }
           onPress={() =>
             k.kind === "PINNED_REF" && k.url
@@ -701,7 +700,7 @@ export function Profile() {
         <ListRow
           key={s.id}
           title={`${s.code} · ${s.title}`}
-          subtitle={s.role.toLowerCase()}
+          subtitle={label(s.role)}
           onPress={() =>
             void run(() => useSession.getState().switchSpace(s.id))
           }
