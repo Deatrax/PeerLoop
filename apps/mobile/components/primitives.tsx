@@ -631,7 +631,9 @@ export function QueueCard({
       <Copy bold>{request.body_text}</Copy>
       <Row>
         <SpaceChip space={spaces.find((s) => s.id === request.space_id)} />
-        <Tag>{request.category.toLowerCase().replaceAll("_", " ")}</Tag>
+        {request.category ? (
+          <Tag>{request.category.toLowerCase().replaceAll("_", " ")}</Tag>
+        ) : null}
       </Row>
       <Row style={{ justifyContent: "space-between" }}>
         <Pill

@@ -1,11 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BaseRepository, Engine, seedDatabase, responseSchema, type Database } from '@peerloop/core';
-const storageKey='peerloop-offline-v1';
+// Bumped from v1: snapshots written by earlier builds are dropped rather than trusted.
+const storageKey='peerloop-offline-v2';
 export class LocalRepository extends BaseRepository {
   private tail:Promise<unknown>=Promise.resolve();
   private offset=0;
   constructor(private uid:()=>string,private scale:()=>number){super();}
-  private async read(){const saved=await AsyncStorage.getItem(storageKey);return saved?JSON.parse(saved) as Database:seedDatabase(Date.now());}
+  // A snapshot from an older build can be missing fields the UI now reads, which white-screens
+  // a whole tab instead of failing loudly. Sanity-check it and fall back to a fresh seed.
+  private async read():Promise<Database>{
+    const saved=await AsyncStorage.getItem(storageKey);
+    if(!saved)return seedDatabase(Date.now());
+    try{
+      const db=JSON.parse(saved) as Database;
+      const fresh=seedDatabase(Date.now());
+      const usable=(Object.keys(fresh) as (keyof Database)[]).every(t=>Array.isArray(db[t]))
+        &&db.requests.every(r=>r.category&&r.state&&r.priority);
+      return usable?db:fresh;
+    }catch{return seedDatabase(Date.now());}
+  }
   async call<T>(method:string,path:string,body:unknown={}):Promise<T>{const work=this.tail.then(async()=>{const db=await this.read();const engine=new Engine(db,{user_id:this.uid()||'arisha',now:Date.now()+this.offset,time_scale:this.scale()});let value:unknown;
     if(path==='/dev/reset'){value={ok:true};await AsyncStorage.setItem(storageKey,JSON.stringify(seedDatabase(Date.now())));this.offset=0;await AsyncStorage.removeItem('peerloop-clock-offset');return value as T;}
     if(path==='/dev/inspect')value=db.agent_runs.slice(-20);

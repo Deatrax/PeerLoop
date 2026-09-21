@@ -1,7 +1,10 @@
 import type { Database, Request, SpaceMembership, User } from './types';
 import { defaultPolicy, nextDeadline } from './escalation/dwell';
 import { tokenize } from './knowledge/search';
-export const demoAccounts=[{studentId:'ARISHA',name:'Arisha',role:'Student'},{studentId:'RIFAT',name:'Rifat',role:'Class representative'},{studentId:'NASRIN',name:'Dr. Nasrin',role:'Instructor'},{studentId:'ADMIN',name:'Department admin',role:'Department'}];
+// Tanvir is the second student so the demo can show both sides of one request: Arisha asks,
+// Tanvir is shortlisted and answers. Order matters — demo accounts are the first members
+// seeded into each hub.
+export const demoAccounts=[{studentId:'ARISHA',name:'Arisha',role:'Student'},{studentId:'TANVIR',name:'Tanvir',role:'Student'},{studentId:'RIFAT',name:'Rifat',role:'Class representative'},{studentId:'NASRIN',name:'Dr. Nasrin',role:'Instructor'},{studentId:'ADMIN',name:'Department admin',role:'Department'}];
 export function seedDatabase(now:number):Database{
   const iso=new Date(now).toISOString(),ago=(days:number)=>new Date(now-days*86400000).toISOString();
   const users:User[]=[...demoAccounts,{studentId:'KAMAL',name:'Dr. Kamal',role:'Instructor'},...Array.from({length:39},(_,i)=>({studentId:`ST${i+1}`,name:['Tahsin','Nabila','Sami','Farhan','Maliha','Raihan','Sadia','Fahim','Nafisa','Adnan','Labib','Mim','Sakib'][i%13]+` ${i+1}`,role:'Student'}))].map(u=>({id:u.studentId.toLowerCase(),student_id:u.studentId,name:u.name,email:`${u.studentId.toLowerCase()}@iut-dhaka.edu`,avatar_initials:u.name.split(' ').map(s=>s[0]).slice(0,2).join(''),active_space_id:'cse4790',push_tokens:[],preferences:{theme:'system',leaderboard:false,notifications:true,tags_only:false,tags:[],quiet_start:'23:00',quiet_end:'07:00'},created_at:ago(30)}));
