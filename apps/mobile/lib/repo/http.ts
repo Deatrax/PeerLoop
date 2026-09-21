@@ -31,7 +31,21 @@ export class HttpRepository extends BaseRepository {
       return value ? responseSchema('GET',path).parse(JSON.parse(value)) as T : null;
     } catch {return null;}
   }
+  // A refresh reloads every mounted screen at once, so the same GET can be requested several
+  // times in one burst. Sharing the in-flight promise collapses those into one round trip.
+  private inflight = new Map<string, Promise<unknown>>();
   async call<T>(method: string, path: string, body?: unknown): Promise<T> {
+    if (method !== "GET") return this.send<T>(method, path, body);
+    const key = `${this.uid()}:${path}`;
+    const existing = this.inflight.get(key) as Promise<T> | undefined;
+    if (existing) return existing;
+    const pending = this.send<T>(method, path, body).finally(() =>
+      this.inflight.delete(key),
+    );
+    this.inflight.set(key, pending);
+    return pending;
+  }
+  private async send<T>(method: string, path: string, body?: unknown): Promise<T> {
     const uid=this.uid();
     const token = await readToken();
     let response: Response | undefined;

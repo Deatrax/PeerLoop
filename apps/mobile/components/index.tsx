@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -89,6 +90,17 @@ export function Screen({
 }) {
   const t = useTheme();
   const error = useSession((s) => s.error);
+  const [refreshing, setRefreshing] = useState(false);
+  // refresh() bumps the session revision, which every useResource subscribes to, so one pull
+  // reloads the session and every resource on the screen.
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    void useSession
+      .getState()
+      .refresh()
+      .catch(useSession.getState().fail)
+      .finally(() => setRefreshing(false));
+  }, []);
   return (
     <SafeAreaView
       edges={["top", "left", "right"]}
@@ -101,6 +113,14 @@ export function Screen({
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 30 }}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={t.muted}
+              colors={[t.flare]}
+            />
+          }
         >
           <TopLine title={title} scoped={scoped} back={back} />
           {error && (
